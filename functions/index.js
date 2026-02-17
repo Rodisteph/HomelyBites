@@ -23,6 +23,7 @@ const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 
 const ONBOARDING_RETURN_URL = 'homelybites://onboarding/return';
 const ONBOARDING_REFRESH_URL = 'homelybites://onboarding/refresh';
+const PAYMENT_INTENT_ORDERS_COLLECTION = 'payment_intent_orders';
 const ORDER_STATUS = Object.freeze({
   PENDING: 'pending',
   CONFIRMED: 'confirmed',
@@ -269,21 +270,42 @@ exports.createOrderAndPaymentIntent = onCall(
         throw new HttpsError('internal', 'PaymentIntent response invalid.');
       }
 
+      const paymentIntentOrderRef = db.collection(PAYMENT_INTENT_ORDERS_COLLECTION).doc(paymentIntent.id);
       try {
-        await orderRef.create({
-          mealId,
-          clientId: uid,
-          hostId,
-          hostStripeAccountId,
-          portions,
-          note,
-          amount,
-          amountCents: amount,
-          currency: 'eur',
-          paymentIntentId: paymentIntent.id,
-          status: 'pending',
-          paymentStatus: PAYMENT_STATUS.REQUIRES_PAYMENT,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        await db.runTransaction(async (tx) => {
+          const mappingSnapshot = await tx.get(paymentIntentOrderRef);
+          const existingOrderId = getStringField(mappingSnapshot.data() ?.orderId);
+          if (existingOrderId && existingOrderId !== orderId) {
+            throw new Error(`PaymentIntent already mapped to another order: ${existingOrderId}`);
+          }
+
+          tx.create(orderRef, {
+            mealId,
+            clientId: uid,
+            hostId,
+            hostStripeAccountId,
+            portions,
+            note,
+            amount,
+            amountCents: amount,
+            currency: 'eur',
+            paymentIntentId: paymentIntent.id,
+            status: ORDER_STATUS.PENDING,
+            paymentStatus: PAYMENT_STATUS.REQUIRES_PAYMENT,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          tx.set(paymentIntentOrderRef, {
+            orderId,
+            paymentIntentId: paymentIntent.id,
+            clientId: uid,
+            hostId,
+            mealId,
+            source: 'createOrderAndPaymentIntent',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {
+            merge: true,
+          });
         });
       } catch (error) {
         logger.error('Failed to persist order after PaymentIntent creation', {
@@ -470,17 +492,80 @@ recordOrphanStripeEvent({
 }
 
 async function
+upsertPaymentIntentOrderMapping({
+  paymentIntentId, orderId, source, eventId, eventType,
+}) {
+  try {
+    await db.collection(PAYMENT_INTENT_ORDERS_COLLECTION).doc(paymentIntentId).set({
+      orderId,
+      paymentIntentId,
+      source,
+      lastEventId: eventId || null,
+      lastEventType: eventType || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, {
+      merge: true,
+    });
+  } catch (error) {
+    logger.warn('Failed to upsert payment intent mapping', {
+      eventId,
+      eventType,
+      paymentIntentId,
+      orderId,
+      source,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function
 findOrderRefByPaymentIntentOrMetadata({
   paymentIntentId, metadataOrderId, eventId, eventType,
 }) {
+  const mappingRef = db.collection(PAYMENT_INTENT_ORDERS_COLLECTION).doc(paymentIntentId);
+  const mappingSnapshot = await mappingRef.get();
+  if (mappingSnapshot.exists) {
+    const mappedOrderId = getStringField(mappingSnapshot.data() ?.orderId);
+    if (mappedOrderId) {
+      const mappedOrderRef = db.collection('orders').doc(mappedOrderId);
+      const mappedOrderSnapshot = await mappedOrderRef.get();
+      if (mappedOrderSnapshot.exists) {
+        return {
+          orderRef: mappedOrderRef,
+          lookupSource: 'paymentIntentMapping',
+        };
+      }
+      logger.error('PaymentIntent mapping points to missing order', {
+        eventId,
+        eventType,
+        paymentIntentId,
+        mappedOrderId,
+      });
+    } else {
+      logger.warn('PaymentIntent mapping missing orderId', {
+        eventId,
+        eventType,
+        paymentIntentId,
+      });
+    }
+  }
+
   const byPaymentIntentSnapshot = await db.collection('orders')
       .where('paymentIntentId', '==', paymentIntentId)
       .limit(1)
       .get();
 
   if (!byPaymentIntentSnapshot.empty) {
+    const orderRef = byPaymentIntentSnapshot.docs[0].ref;
+    await upsertPaymentIntentOrderMapping({
+      paymentIntentId,
+      orderId: orderRef.id,
+      source: 'webhook.paymentIntentId',
+      eventId,
+      eventType,
+    });
     return {
-      orderRef: byPaymentIntentSnapshot.docs[0].ref,
+      orderRef,
       lookupSource: 'paymentIntentId',
     };
   }
@@ -503,6 +588,13 @@ findOrderRefByPaymentIntentOrMetadata({
           paymentIntentId,
         });
       }
+      await upsertPaymentIntentOrderMapping({
+        paymentIntentId,
+        orderId: byOrderIdRef.id,
+        source: 'webhook.metadata.orderId',
+        eventId,
+        eventType,
+      });
       return {
         orderRef: byOrderIdRef,
         lookupSource: 'metadata.orderId',
