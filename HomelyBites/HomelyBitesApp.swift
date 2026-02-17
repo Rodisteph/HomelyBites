@@ -1,5 +1,7 @@
 import SwiftUI
 import StripeCore
+import FirebaseCore
+
 
 @main
 struct HomelyBitesApp: App {
@@ -7,6 +9,9 @@ struct HomelyBitesApp: App {
     @StateObject private var sessionViewModel = SessionViewModel()
 
     init() {
+        if FirebaseApp.app() == nil {
+            FirebaseApp.configure()
+        }
         StripeInitializer.configure()
     }
 

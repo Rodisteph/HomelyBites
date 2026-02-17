@@ -3,8 +3,8 @@ import FirebaseAuth
 import FirebaseFirestore
 
 final class AuthService {
-    private let auth = Auth.auth()
-    private let db = Firestore.firestore()
+    private lazy var auth = Auth.auth()
+    private lazy var db = Firestore.firestore()
 
     func signIn(email: String, password: String) async throws {
         _ = try await auth.signInAsync(email: email, password: password)
