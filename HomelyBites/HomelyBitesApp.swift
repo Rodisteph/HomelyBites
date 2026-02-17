@@ -9,6 +9,9 @@ struct HomelyBitesApp: App {
     @StateObject private var sessionViewModel = SessionViewModel()
 
     init() {
+        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") == nil {
+            print("Warning: GoogleService-Info.plist not found in app bundle.")
+        }
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }

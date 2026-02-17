@@ -3,7 +3,7 @@ import Foundation
 import FirebaseFirestore
 
 final class FirestoreService {
-    private let db = Firestore.firestore()
+    private lazy var db = Firestore.firestore()
 
     // MARK: - Users
 
