@@ -16,6 +16,13 @@ if [[ ! -f "$PLIST" ]]; then
   exit 1
 fi
 
+DUPLICATES="$(find "$ROOT_DIR" -maxdepth 1 -type f -name 'GoogleService-Info*.plist' ! -name 'GoogleService-Info.plist' -print)"
+if [[ -n "${DUPLICATES:-}" ]]; then
+  echo "ERROR: duplicate Firebase plist files found (only GoogleService-Info.plist is allowed):"
+  echo "$DUPLICATES"
+  exit 1
+fi
+
 PROJECT_BUNDLE_ID="$(rg -n "PRODUCT_BUNDLE_IDENTIFIER = " "$PBXPROJ" | head -n1 | sed -E 's/.*PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/\1/')"
 PLIST_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$PLIST")"
 

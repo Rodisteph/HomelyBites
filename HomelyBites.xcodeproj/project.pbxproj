@@ -13,11 +13,11 @@
 		0B89EDD72F3F8BFF00E848E4 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD62F3F8BFF00E848E4 /* FirebaseFunctions */; };
 		0B89EDDA2F3F8CC200E848E4 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD92F3F8CC200E848E4 /* StripePaymentSheet */; };
 		0B89EDDC2F3F8CC200E848E4 /* StripePayments in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDDB2F3F8CC200E848E4 /* StripePayments */; };
-		0BB9EEDF2F4604E600FF52F0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0BB9EEDE2F4604E500FF52F0 /* GoogleService-Info.plist */; };
+		0BB9EF3D2F46075300FF52F0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0BB9EEDE2F4604E500FF52F0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		11B1A0012E7F2FFA00428788 /* HomelyBites.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomelyBites.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -72,7 +72,7 @@
 				11B1A0022E7F2FFA00428788 /* HomelyBites */,
 				0BA077352F3F85B00029C4B4 /* Frameworks */,
 				11B1A0052E7F2FFA00428788 /* Products */,
-				0BB9EEDE2F4604E500FF52F0 /* GoogleService-Info.plist */,
+				0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -158,7 +158,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0BB9EEDF2F4604E600FF52F0 /* GoogleService-Info.plist in Resources */,
+				0BB9EF3D2F46075300FF52F0 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
