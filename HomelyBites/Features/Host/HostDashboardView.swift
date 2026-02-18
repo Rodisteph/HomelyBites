@@ -2,7 +2,19 @@ import SwiftUI
 
 struct HostDashboardView: View {
     @EnvironmentObject private var session: SessionViewModel
-    @StateObject private var viewModel = HostDashboardViewModel()
+    @StateObject private var viewModel: HostDashboardViewModel
+
+    init(
+        firestoreService: FirestoreService = FirestoreService(),
+        functionsService: CloudFunctionsService = CloudFunctionsService()
+    ) {
+        _viewModel = StateObject(
+            wrappedValue: HostDashboardViewModel(
+                firestoreService: firestoreService,
+                functionsService: functionsService
+            )
+        )
+    }
 
     var body: some View {
         List {
@@ -15,8 +27,8 @@ struct HostDashboardView: View {
                             .font(.caption.weight(.semibold))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(user.isStripeReady ? Color.green.opacity(0.2) : Color.orange.opacity(0.2), in: Capsule())
-                            .foregroundStyle(user.isStripeReady ? .green : .orange)
+                            .background(user.isStripeReady ? AppColors.success.opacity(0.18) : AppColors.warning.opacity(0.18), in: Capsule())
+                            .foregroundStyle(user.isStripeReady ? AppColors.success : AppColors.warning)
                     }
 
                     Button {
@@ -33,6 +45,7 @@ struct HostDashboardView: View {
                             Text("Activer paiements")
                         }
                     }
+                    .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isActivatingPayments))
 
                     Button("Rafraichir profil Stripe") {
                         Task {
@@ -55,7 +68,32 @@ struct HostDashboardView: View {
                     if let successMessage = viewModel.successMessage {
                         Text(successMessage)
                             .font(.footnote)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(AppColors.success)
+                    }
+
+                    if viewModel.hostMeals.isEmpty {
+                        Text("Aucun plat publie pour le moment.")
+                            .foregroundStyle(AppColors.textSecondary)
+                    } else {
+                        ForEach(viewModel.hostMeals) { meal in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(meal.title)
+                                        .font(.headline)
+                                    Spacer()
+                                    Text(meal.priceCents.asEuro())
+                                        .foregroundStyle(AppColors.primary)
+                                }
+                                Text("Portions: \(meal.availablePortions)")
+                                    .font(.caption)
+                                    .foregroundStyle(AppColors.textSecondary)
+                            }
+                            .padding(.vertical, 4)
+                            .appCard()
+                        }
+                        .onDelete { offsets in
+                            viewModel.requestMealDeletion(at: offsets)
+                        }
                     }
                 }
             }
@@ -63,17 +101,17 @@ struct HostDashboardView: View {
             Section("Commandes recues") {
                 if viewModel.receivedOrders.isEmpty {
                     Text("Aucune commande pour le moment.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.textSecondary)
                 } else {
                     ForEach(viewModel.receivedOrders) { order in
                         HostOrderRow(
                             order: order,
                             onConfirm: {
-                                guard let orderId = order.id else { return }
+                                let orderId = order.id
                                 Task { await viewModel.updateOrderStatus(orderId: orderId, status: .confirmed) }
                             },
                             onReject: {
-                                guard let orderId = order.id else { return }
+                                let orderId = order.id
                                 Task { await viewModel.updateOrderStatus(orderId: orderId, status: .rejected) }
                             }
                         )
@@ -81,6 +119,8 @@ struct HostDashboardView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppColors.background)
         .navigationTitle("Host Dashboard")
         .task {
             guard let hostId = session.appUser?.id else { return }
@@ -94,7 +134,15 @@ struct HostDashboardView: View {
             await viewModel.refresh(hostId: hostId)
             await session.refreshUserProfile()
         }
-        .sheet(isPresented: $viewModel.showingCreateMeal) {
+        .sheet(
+            isPresented: $viewModel.showingCreateMeal,
+            onDismiss: {
+                guard let hostId = session.appUser?.id else { return }
+                Task {
+                    await viewModel.refresh(hostId: hostId)
+                }
+            }
+        ) {
             if let user = session.appUser {
                 CreateMealView(host: user)
             }
@@ -122,6 +170,25 @@ struct HostDashboardView: View {
                 Text(viewModel.errorMessage ?? "")
             }
         )
+        .alert(
+            "Supprimer ce plat ?",
+            isPresented: Binding(
+                get: { viewModel.pendingDeletionMeal != nil },
+                set: { if !$0 { viewModel.pendingDeletionMeal = nil } }
+            ),
+            presenting: viewModel.pendingDeletionMeal
+        ) { meal in
+            Button("Annuler", role: .cancel) {}
+            Button("Supprimer", role: .destructive) {
+                guard let hostId = session.appUser?.id else { return }
+                Task {
+                    await viewModel.confirmMealDeletion(hostId: hostId)
+                }
+            }
+            .disabled(viewModel.isDeletingMeal)
+        } message: { meal in
+            Text("Le plat \"\(meal.title)\" sera supprime definitivement.")
+        }
     }
 }
 
@@ -133,10 +200,12 @@ private struct HostOrderRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Order #\(order.id?.prefix(6) ?? "-")")
+                Text("Order #\(order.id.prefix(6))")
                     .font(.headline)
+                    .foregroundStyle(AppColors.textPrimary)
                 Spacer()
                 Text(order.amountCents.asEuro())
+                    .foregroundStyle(AppColors.primary)
             }
 
             Text("Payment: \(order.paymentStatus.displayTitle)")
@@ -158,20 +227,21 @@ private struct HostOrderRow: View {
             } else {
                 Text("Status: \(order.status.displayTitle)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.textSecondary)
             }
         }
         .padding(.vertical, 4)
+        .appCard()
     }
 
     private var paymentColor: Color {
         switch order.paymentStatus {
         case .requires_payment:
-            return .orange
+            return AppColors.warning
         case .paid:
-            return .green
+            return AppColors.success
         case .failed:
-            return .red
+            return AppColors.danger
         case .refunded:
             return .purple
         }

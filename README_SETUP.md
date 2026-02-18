@@ -14,6 +14,9 @@
    - Stripe iOS SDK: `https://github.com/stripe/stripe-ios`
    - Products: `StripePaymentSheet`, `StripeCore`
 3. Add `GoogleService-Info.plist` into `HomelyBites/` target.
+   - Must include keys: `CLIENT_ID` and `REVERSED_CLIENT_ID`
+   - `BUNDLE_ID` must match `PRODUCT_BUNDLE_IDENTIFIER`
+   - Add `REVERSED_CLIENT_ID` to `Info.plist` > `CFBundleURLTypes`
 4. Set Stripe publishable key in `HomelyBites/Info.plist`:
    - `STRIPE_PUBLISHABLE_KEY = pk_test_xxx` (safe in app)
 5. Bundle identifier placeholder is already:
@@ -31,6 +34,14 @@ Deploy Firestore rules:
 
 ```bash
 firebase deploy --only firestore:rules
+```
+
+Meal deletion security is enforced in rules:
+
+```txt
+match /meals/{mealId} {
+  allow delete: if request.auth != null && resource.data.hostId == request.auth.uid;
+}
 ```
 
 ## 4) Cloud Functions install/deploy

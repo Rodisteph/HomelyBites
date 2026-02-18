@@ -26,6 +26,19 @@ final class FirestoreService {
         }
     }
 
+    func fetchMeals(hostId: String) async throws -> [Meal] {
+        let snapshot = try await db
+            .collection("meals")
+            .whereField("hostId", isEqualTo: hostId)
+            .getDocumentsAsync()
+
+        let meals = snapshot.documents.compactMap { Meal(document: $0) }
+
+        return meals.sorted {
+            ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
+        }
+    }
+
     func createMeal(
         host: AppUser,
         title: String,
@@ -71,38 +84,33 @@ final class FirestoreService {
         )
     }
 
-    // MARK: - Orders
+    func deleteMeal(mealId: String, hostId: String) async throws {
+        let mealRef = db.collection("meals").document(mealId)
+        let snapshot = try await mealRef.getDocumentAsync()
 
-    func createOrder(
-        meal: Meal,
-        clientId: String,
-        hostStripeAccountId: String,
-        portions: Int,
-        note: String
-    ) async throws -> String {
+        guard snapshot.exists else {
+            #if DEBUG
+            debugLog("[FirestoreService][deleteMeal] meal already deleted mealId=\(mealId)")
+            #endif
+            return
+        }
 
-        let amountCents = meal.priceCents * portions
-        let orderRef = db.collection("orders").document()
+        guard let data = snapshot.data(),
+              let ownerId = data["hostId"] as? String else {
+            throw AppError.invalidResponse
+        }
 
-        let order = Order(
-            id: orderRef.documentID,
-            mealId: meal.id,
-            clientId: clientId,
-            hostId: meal.hostId,
-            hostStripeAccountId: hostStripeAccountId,
-            portions: portions,
-            note: note,
-            status: .pending,
-            paymentStatus: .requires_payment,
-            amountCents: amountCents,
-            currency: "eur",
-            paymentIntentId: nil,
-            createdAt: nil
-        )
+        guard ownerId == hostId else {
+            throw AppError.invalidInput("Suppression refusee: ce plat n'appartient pas a ce compte host.")
+        }
 
-        try await orderRef.setDataAsync(order.toFirestore(), merge: true)
-        return orderRef.documentID
+        try await mealRef.deleteAsync()
+        #if DEBUG
+        debugLog("[FirestoreService][deleteMeal] success mealId=\(mealId) hostId=\(hostId)")
+        #endif
     }
+
+    // MARK: - Orders
 
     func fetchClientOrders(clientId: String) async throws -> [Order] {
         let snapshot = try await db
@@ -182,9 +190,9 @@ final class FirestoreService {
             }
     }
 
-    func updateOrderStatus(orderId: String, status: OrderStatus) async throws {
-        try await db.collection("orders")
-            .document(orderId)
-            .updateDataAsync(["status": status.rawValue])
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        NSLog("%@", message)
+        #endif
     }
 }

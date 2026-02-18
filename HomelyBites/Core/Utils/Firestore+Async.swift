@@ -7,7 +7,7 @@ extension DocumentReference {
 
     /// Remplace setData(from:) (FirestoreSwift) par setData([String:Any])
     func setDataAsync(_ data: [String: Any], merge: Bool = false) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.setData(data, merge: merge) { error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -19,7 +19,7 @@ extension DocumentReference {
     }
 
     func updateDataAsync(_ fields: [AnyHashable: Any]) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.updateData(fields) { error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -42,6 +42,18 @@ extension DocumentReference {
                     return
                 }
                 continuation.resume(returning: snapshot)
+            }
+        }
+    }
+
+    func deleteAsync() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.delete { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
             }
         }
     }

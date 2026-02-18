@@ -43,56 +43,17 @@ service cloud.firestore {
         && request.resource.data.availablePortions is int
         && request.resource.data.availablePortions > 0;
 
-      allow update, delete: if isSignedIn()
+      allow update: if isSignedIn()
         && resource.data.hostId == request.auth.uid
         && request.resource.data.hostId == resource.data.hostId;
+
+      allow delete: if isSignedIn()
+        && resource.data.hostId == request.auth.uid;
     }
 
     match /orders/{orderId} {
       allow read: if isOrderParticipant();
-
-      allow create: if isSignedIn()
-        && request.resource.data.clientId == request.auth.uid
-        && request.resource.data.status == "pending"
-        && request.resource.data.paymentStatus == "requires_payment"
-        && request.resource.data.amountCents is int
-        && request.resource.data.amountCents > 0
-        && request.resource.data.currency == "eur"
-        && request.resource.data.hostStripeAccountId is string
-        && (
-          !request.resource.data.keys().hasAny(["paymentIntentId"])
-          || request.resource.data.paymentIntentId == null
-        );
-
-      allow update: if isSignedIn() && (
-        (
-          resource.data.clientId == request.auth.uid
-          && request.resource.data.clientId == resource.data.clientId
-          && request.resource.data.hostId == resource.data.hostId
-          && request.resource.data.mealId == resource.data.mealId
-          && request.resource.data.hostStripeAccountId == resource.data.hostStripeAccountId
-          && request.resource.data.amountCents == resource.data.amountCents
-          && request.resource.data.currency == resource.data.currency
-          && request.resource.data.paymentIntentId == resource.data.paymentIntentId
-          && request.resource.data.status in ["pending", "cancelled"]
-          && paymentStatusUnchanged()
-        )
-        ||
-        (
-          resource.data.hostId == request.auth.uid
-          && request.resource.data.clientId == resource.data.clientId
-          && request.resource.data.hostId == resource.data.hostId
-          && request.resource.data.mealId == resource.data.mealId
-          && request.resource.data.hostStripeAccountId == resource.data.hostStripeAccountId
-          && request.resource.data.amountCents == resource.data.amountCents
-          && request.resource.data.currency == resource.data.currency
-          && request.resource.data.paymentIntentId == resource.data.paymentIntentId
-          && request.resource.data.status in ["pending", "confirmed", "rejected", "cancelled"]
-          && paymentStatusUnchanged()
-        )
-      );
-
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
   }
 }
