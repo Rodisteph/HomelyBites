@@ -1,18 +1,27 @@
 import SwiftUI
 
 struct RootView: View {
+    @EnvironmentObject private var container: AppContainer
     @EnvironmentObject private var session: SessionViewModel
 
     var body: some View {
         Group {
             if session.isBootstrapping {
                 ProgressView("Chargement...")
+                    .tint(AppColors.primary)
             } else if session.isAuthenticated {
                 authenticatedTabs
+                    .overlay(alignment: .topTrailing) {
+                        BrandLogoView(size: 28)
+                            .padding(.top, 6)
+                            .padding(.trailing, 10)
+                            .allowsHitTesting(false)
+                    }
             } else {
-                AuthView()
+                AuthView(authService: container.authService)
             }
         }
+        .background(AppColors.background.ignoresSafeArea())
         .alert(
             "Erreur",
             isPresented: Binding(
@@ -48,7 +57,10 @@ struct RootView: View {
 
             if session.appUser?.role == .host {
                 NavigationStack {
-                    HostDashboardView()
+                    HostDashboardView(
+                        firestoreService: container.firestoreService,
+                        functionsService: container.cloudFunctionsService
+                    )
                 }
                 .tabItem {
                     Label("Host", systemImage: "house")

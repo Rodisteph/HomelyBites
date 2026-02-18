@@ -4,8 +4,16 @@ struct MealDetailView: View {
     @EnvironmentObject private var session: SessionViewModel
     @StateObject private var viewModel: MealDetailViewModel
 
-    init(meal: Meal) {
-        _viewModel = StateObject(wrappedValue: MealDetailViewModel(meal: meal))
+    init(
+        meal: Meal,
+        functionsService: CloudFunctionsService = CloudFunctionsService()
+    ) {
+        _viewModel = StateObject(
+            wrappedValue: MealDetailViewModel(
+                meal: meal,
+                functionsService: functionsService
+            )
+        )
     }
 
     var body: some View {
@@ -13,18 +21,20 @@ struct MealDetailView: View {
             Section("Repas") {
                 Text(viewModel.meal.title)
                     .font(.title3.weight(.bold))
+                    .foregroundStyle(AppColors.textPrimary)
                 Text(viewModel.meal.description)
+                    .foregroundStyle(AppColors.textSecondary)
                 HStack {
                     Text("Host")
                     Spacer()
                     Text(viewModel.meal.hostName)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.textSecondary)
                 }
                 HStack {
                     Text("Prix unitaire")
                     Spacer()
                     Text(viewModel.meal.priceCents.asEuro())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.primary)
                 }
             }
 
@@ -33,9 +43,11 @@ struct MealDetailView: View {
 
                 Text("Total: \(viewModel.totalPriceCents.asEuro())")
                     .font(.headline)
+                    .foregroundStyle(AppColors.textPrimary)
 
                 TextField("Note (optionnelle)", text: $viewModel.note, axis: .vertical)
                     .lineLimit(3, reservesSpace: true)
+                    .appTextFieldStyle()
             }
 
             if viewModel.confirmationInProgress {
@@ -47,32 +59,39 @@ struct MealDetailView: View {
 
             Section {
                 Button {
-                    guard let clientId = session.appUser?.id else {
+                    guard session.appUser?.id != nil else {
                         viewModel.errorMessage = AppError.missingAuth.localizedDescription
                         return
                     }
                     Task {
-                        await viewModel.reserveAndPay(clientId: clientId)
+                        await viewModel.reserveAndPay()
                     }
                 } label: {
                     if viewModel.isLoading {
                         ProgressView()
+                            .tint(.white)
                     } else {
                         Text("Reserver & payer")
                     }
                 }
+                .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isLoading))
                 .disabled(viewModel.isLoading)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppColors.background)
         .navigationTitle("Detail")
         .sheet(
             isPresented: Binding(
-                get: { viewModel.createdOrderId != nil },
-                set: { if !$0 { viewModel.createdOrderId = nil } }
+                get: { viewModel.checkoutSession != nil },
+                set: { if !$0 { viewModel.checkoutSession = nil } }
             )
         ) {
-            if let orderId = viewModel.createdOrderId {
-                CheckoutView(orderId: orderId) {
+            if let checkoutSession = viewModel.checkoutSession {
+                CheckoutView(
+                    orderId: checkoutSession.orderId,
+                    clientSecret: checkoutSession.clientSecret
+                ) {
                     viewModel.paymentDidComplete()
                 }
             }
