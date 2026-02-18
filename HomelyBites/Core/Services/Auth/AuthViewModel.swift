@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
+import UIKit
 
 @MainActor
 final class AuthViewModel: ObservableObject {
@@ -78,6 +79,18 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    func signInWithGoogle(presenting: UIViewController) async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            _ = try await authService.signInWithGoogle(presenting: presenting)
+        } catch {
+            logSubmitError(error)
+            errorMessage = userFacingMessage(for: error)
+        }
+    }
+
     private func userFacingMessage(for error: Error) -> String {
         if let appError = error as? AppError {
             return appError.localizedDescription
@@ -88,6 +101,14 @@ final class AuthViewModel: ObservableObject {
         if nsError.domain == AuthErrorDomain,
            let authCode = AuthErrorCode(rawValue: nsError.code)?.code {
             switch authCode {
+            case .wrongPassword:
+                return "Mot de passe incorrect."
+            case .userNotFound:
+                return "Aucun compte trouve pour cet email."
+            case .invalidCredential:
+                return "Email ou mot de passe invalide."
+            case .userDisabled:
+                return "Ce compte est desactive. Contacte le support."
             case .emailAlreadyInUse:
                 return "Cet email est deja utilise."
             case .invalidEmail:
@@ -126,6 +147,13 @@ final class AuthViewModel: ObservableObject {
             return "Aucune connexion internet. Reessaie quand le reseau est disponible."
         }
 
+        if nsError.domain == "com.google.GIDSignIn" {
+            if nsError.code == -5 {
+                return "Connexion Google annulee."
+            }
+            return "Connexion Google impossible pour le moment."
+        }
+
         return "Une erreur interne est survenue. Reessaie."
     }
 
@@ -138,10 +166,29 @@ final class AuthViewModel: ObservableObject {
         debugLog("[AuthViewModel][submit] domain=\(nsError.domain) code=\(nsError.code)")
         debugLog("[AuthViewModel][submit] localizedDescription=\(nsError.localizedDescription)")
         debugLog("[AuthViewModel][submit] userInfo=\(nsError.userInfo)")
+
+        for key in [
+            "FIRAuthErrorUserInfoNameKey",
+            "FIRAuthErrorUserInfoDeserializedResponseKey",
+            "FIRAuthErrorUserInfoUpdatedCredentialKey"
+        ] {
+            if let value = nsError.userInfo[key] {
+                debugLog("[AuthViewModel][submit] \(key)=\(value)")
+            }
+        }
+
         if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
             debugLog("[AuthViewModel][submit] underlying.domain=\(underlying.domain) code=\(underlying.code)")
             debugLog("[AuthViewModel][submit] underlying.localizedDescription=\(underlying.localizedDescription)")
             debugLog("[AuthViewModel][submit] underlying.userInfo=\(underlying.userInfo)")
+        }
+
+        if let detailedErrors = nsError.userInfo["NSDetailedErrors"] as? [NSError], !detailedErrors.isEmpty {
+            for (index, item) in detailedErrors.enumerated() {
+                debugLog("[AuthViewModel][submit] detailed[\(index)].domain=\(item.domain) code=\(item.code)")
+                debugLog("[AuthViewModel][submit] detailed[\(index)].localizedDescription=\(item.localizedDescription)")
+                debugLog("[AuthViewModel][submit] detailed[\(index)].userInfo=\(item.userInfo)")
+            }
         }
         #endif
     }

@@ -14,6 +14,7 @@
 		0B89EDDA2F3F8CC200E848E4 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD92F3F8CC200E848E4 /* StripePaymentSheet */; };
 		0B89EDDC2F3F8CC200E848E4 /* StripePayments in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDDB2F3F8CC200E848E4 /* StripePayments */; };
 		0BB9EF3D2F46075300FF52F0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */; };
+		0BC7A1012F70A10000B1AA01 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 0BC7A1032F70A10000B1AA01 /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -52,6 +53,7 @@
 				0B89EDD12F3F8BFF00E848E4 /* FirebaseAuth in Frameworks */,
 				0B89EDD52F3F8BFF00E848E4 /* FirebaseFirestore in Frameworks */,
 				0B89EDD72F3F8BFF00E848E4 /* FirebaseFunctions in Frameworks */,
+				0BC7A1012F70A10000B1AA01 /* GoogleSignIn in Frameworks */,
 				0B89EDDA2F3F8CC200E848E4 /* StripePaymentSheet in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -108,6 +110,7 @@
 				0B89EDD22F3F8BFF00E848E4 /* FirebaseCore */,
 				0B89EDD42F3F8BFF00E848E4 /* FirebaseFirestore */,
 				0B89EDD62F3F8BFF00E848E4 /* FirebaseFunctions */,
+				0BC7A1032F70A10000B1AA01 /* GoogleSignIn */,
 				0B89EDD92F3F8CC200E848E4 /* StripePaymentSheet */,
 				0B89EDDB2F3F8CC200E848E4 /* StripePayments */,
 			);
@@ -142,6 +145,7 @@
 			packageReferences = (
 				0B89EDCF2F3F8BFF00E848E4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				0B89EDD82F3F8CC200E848E4 /* XCRemoteSwiftPackageReference "stripe-ios" */,
+				0BC7A1022F70A10000B1AA01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 11B1A0052E7F2FFA00428788 /* Products */;
@@ -373,6 +377,14 @@
 				minimumVersion = 25.6.2;
 			};
 		};
+		0BC7A1022F70A10000B1AA01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -405,6 +417,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0B89EDD82F3F8CC200E848E4 /* XCRemoteSwiftPackageReference "stripe-ios" */;
 			productName = StripePayments;
+		};
+		0BC7A1032F70A10000B1AA01 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0BC7A1022F70A10000B1AA01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

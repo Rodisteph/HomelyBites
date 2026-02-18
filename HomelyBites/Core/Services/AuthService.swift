@@ -1,6 +1,8 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
+import GoogleSignIn
+import UIKit
 
 final class AuthService {
     private lazy var auth = Auth.auth()
@@ -8,7 +10,70 @@ final class AuthService {
     private let usersCollection = "users"
 
     func signIn(email: String, password: String) async throws {
-        _ = try await auth.signInAsync(email: email, password: password)
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        #if DEBUG
+        debugLog("[AuthService][signIn] start email=\(maskedEmail(normalizedEmail))")
+        #endif
+
+        do {
+            _ = try await auth.signInAsync(email: normalizedEmail, password: password)
+            #if DEBUG
+            debugLog("[AuthService][signIn] success email=\(maskedEmail(normalizedEmail)) uid=\(auth.currentUser?.uid ?? "nil")")
+            #endif
+        } catch {
+            logNSErrorDetails(
+                error,
+                context: "auth.signIn",
+                email: normalizedEmail,
+                role: nil,
+                userId: auth.currentUser?.uid
+            )
+            throw error
+        }
+    }
+
+    func signInWithGoogle(presenting: UIViewController) async throws -> AuthDataResult {
+        #if DEBUG
+        debugLog("[GOOGLE] start")
+        #endif
+
+        guard let clientID = FirebaseRuntimeConfig.googleClientID() else {
+            #if DEBUG
+            debugLog("[GOOGLE] clientID missing. \(FirebaseRuntimeConfig.googleChecklist())")
+            #endif
+            throw AppError.invalidInput("Google Sign-In non configure (clientID Firebase manquant). Verifie GoogleService-Info.plist + URL scheme.")
+        }
+
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+
+        do {
+            let signInResult = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenting)
+            guard let idToken = signInResult.user.idToken?.tokenString else {
+                throw AppError.invalidInput("Google Sign-In non configure (idToken Google manquant).")
+            }
+
+            let accessToken = signInResult.user.accessToken.tokenString
+            let credential = GoogleAuthProvider.credential(
+                withIDToken: idToken,
+                accessToken: accessToken
+            )
+
+            let authResult = try await signInWithCredentialAsync(credential)
+            #if DEBUG
+            debugLog("[GOOGLE] success uid=\(authResult.user.uid)")
+            #endif
+            return authResult
+        } catch {
+            logNSErrorDetails(
+                error,
+                context: "google.signIn",
+                email: auth.currentUser?.email ?? "google-user",
+                role: nil,
+                userId: auth.currentUser?.uid
+            )
+            throw error
+        }
     }
 
     func signUp(email: String, password: String, fullName: String, role: UserRole) async throws {
@@ -83,15 +148,26 @@ final class AuthService {
         _ error: Error,
         context: String,
         email: String,
-        role: UserRole,
+        role: UserRole?,
         userId: String?
     ) {
         #if DEBUG
         let nsError = error as NSError
-        debugLog("[AuthService][\(context)] signup_failed email=\(maskedEmail(email)) role=\(role.rawValue) uid=\(userId ?? "nil")")
+        let roleLabel = role?.rawValue ?? "n/a"
+        debugLog("[AuthService][\(context)] auth_failed email=\(maskedEmail(email)) role=\(roleLabel) uid=\(userId ?? "nil")")
         debugLog("[AuthService][\(context)] domain=\(nsError.domain) code=\(nsError.code)")
         debugLog("[AuthService][\(context)] localizedDescription=\(nsError.localizedDescription)")
         debugLog("[AuthService][\(context)] userInfo=\(nsError.userInfo)")
+
+        for key in [
+            "FIRAuthErrorUserInfoNameKey",
+            "FIRAuthErrorUserInfoDeserializedResponseKey",
+            "FIRAuthErrorUserInfoUpdatedCredentialKey"
+        ] {
+            if let value = nsError.userInfo[key] {
+                debugLog("[AuthService][\(context)] \(key)=\(value)")
+            }
+        }
 
         if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
             debugLog("[AuthService][\(context)] underlying[0].domain=\(underlying.domain) code=\(underlying.code)")
@@ -109,7 +185,38 @@ final class AuthService {
         #endif
     }
 
+    private func signInWithCredentialAsync(_ credential: AuthCredential) async throws -> AuthDataResult {
+        try await withCheckedThrowingContinuation { continuation in
+            auth.signIn(with: credential) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let result else {
+                    continuation.resume(throwing: AppError.invalidResponse)
+                    return
+                }
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
     #if DEBUG
+    func debugSignInProbe(email: String, password: String) async {
+        do {
+            try await signIn(email: email, password: password)
+            debugLog("[AuthService][debugSignInProbe] success email=\(maskedEmail(email)) uid=\(auth.currentUser?.uid ?? "nil")")
+        } catch {
+            logNSErrorDetails(
+                error,
+                context: "debugSignInProbe",
+                email: email,
+                role: nil,
+                userId: auth.currentUser?.uid
+            )
+        }
+    }
+
     func debugSignUpProbe(email: String, password: String, fullName: String, role: UserRole) async {
         do {
             try await signUp(email: email, password: password, fullName: fullName, role: role)
