@@ -1,4 +1,6 @@
 import Foundation
+import FirebaseAuth
+import FirebaseFirestore
 
 @MainActor
 final class AuthViewModel: ObservableObject {
@@ -31,7 +33,11 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    private let authService = AuthService()
+    private let authService: AuthService
+
+    init(authService: AuthService = AuthService()) {
+        self.authService = authService
+    }
 
     func submit() async {
         guard !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -67,7 +73,90 @@ final class AuthViewModel: ObservableObject {
                 )
             }
         } catch {
-            errorMessage = error.localizedDescription
+            logSubmitError(error)
+            errorMessage = userFacingMessage(for: error)
         }
+    }
+
+    private func userFacingMessage(for error: Error) -> String {
+        if let appError = error as? AppError {
+            return appError.localizedDescription
+        }
+
+        let nsError = error as NSError
+
+        if nsError.domain == AuthErrorDomain,
+           let authCode = AuthErrorCode(rawValue: nsError.code)?.code {
+            switch authCode {
+            case .emailAlreadyInUse:
+                return "Cet email est deja utilise."
+            case .invalidEmail:
+                return "Adresse email invalide."
+            case .weakPassword:
+                return "Mot de passe trop faible (minimum 6 caracteres)."
+            case .networkError:
+                return "Probleme reseau. Verifie ta connexion et reessaie."
+            case .tooManyRequests:
+                return "Trop de tentatives. Reessaie dans quelques minutes."
+            case .operationNotAllowed:
+                return "Inscription email/mot de passe non activee dans Firebase."
+            case .appNotAuthorized, .invalidAPIKey:
+                return "Configuration Firebase invalide (bundle id ou GoogleService-Info.plist)."
+            case .internalError:
+                return "Erreur interne Firebase. Verifie la configuration du projet."
+            default:
+                return nsError.localizedDescription
+            }
+        }
+
+        if nsError.domain == FirestoreErrorDomain || nsError.domain == "FIRFirestoreErrorDomain" {
+            switch nsError.code {
+            case 7:
+                return "Compte cree mais permission Firestore refusee pour creer le profil."
+            case 14:
+                return "Firestore est indisponible. Reessaie dans un instant."
+            case 16:
+                return "Session invalide pendant la creation du profil. Reconnecte-toi."
+            default:
+                return "Compte cree mais impossible de finaliser le profil utilisateur."
+            }
+        }
+
+        if nsError.domain == NSURLErrorDomain {
+            return "Aucune connexion internet. Reessaie quand le reseau est disponible."
+        }
+
+        return "Une erreur interne est survenue. Reessaie."
+    }
+
+    private func logSubmitError(_ error: Error) {
+        #if DEBUG
+        let nsError = error as NSError
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let masked = maskedEmail(normalizedEmail)
+        debugLog("[AuthViewModel][submit] failure mode=\(mode.rawValue) email=\(masked) role=\(selectedRole.rawValue)")
+        debugLog("[AuthViewModel][submit] domain=\(nsError.domain) code=\(nsError.code)")
+        debugLog("[AuthViewModel][submit] localizedDescription=\(nsError.localizedDescription)")
+        debugLog("[AuthViewModel][submit] userInfo=\(nsError.userInfo)")
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            debugLog("[AuthViewModel][submit] underlying.domain=\(underlying.domain) code=\(underlying.code)")
+            debugLog("[AuthViewModel][submit] underlying.localizedDescription=\(underlying.localizedDescription)")
+            debugLog("[AuthViewModel][submit] underlying.userInfo=\(underlying.userInfo)")
+        }
+        #endif
+    }
+
+    private func maskedEmail(_ email: String) -> String {
+        let parts = email.split(separator: "@", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else {
+            return "***"
+        }
+        return "\(parts[0].prefix(2))***@\(parts[1])"
+    }
+
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        NSLog("%@", message)
+        #endif
     }
 }
