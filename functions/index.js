@@ -39,7 +39,12 @@ const PAYMENT_STATUS = Object.freeze({
 
 function
 getStripeClient() {
-  return new Stripe(STRIPE_SECRET_KEY.value());
+  const secret = STRIPE_SECRET_KEY.value();
+  if (!secret || typeof secret !== 'string') {
+    logger.error('STRIPE_SECRET_KEY missing or invalid');
+    throw new HttpsError('failed-precondition', 'Stripe backend not configured.');
+  }
+  return new Stripe(secret);
 }
 
 function
@@ -86,6 +91,9 @@ exports.createConnectAccount = onCall(
     },
     async (request) => {
       const uid = assertAuthenticated(request);
+      logger.info('createConnectAccount called', {
+        uid,
+      });
       const {
         userRef, userData,
       } = await getUserProfile(uid);
@@ -130,6 +138,9 @@ exports.createOnboardingLink = onCall(
     },
     async (request) => {
       const uid = assertAuthenticated(request);
+      logger.info('createOnboardingLink called', {
+        uid,
+      });
       const {
         userData,
       } = await getUserProfile(uid);
@@ -167,6 +178,11 @@ exports.createOrderAndPaymentIntent = onCall(
       const mealId = request.data ?.mealId;
       const portions = request.data ?.portions;
       const rawNote = request.data ?.note;
+      logger.info('createOrderAndPaymentIntent called', {
+        uid,
+        mealId: typeof mealId === 'string' ? mealId : null,
+        portions: Number.isInteger(portions) ? portions : null,
+      });
 
       if (!mealId || typeof mealId !== 'string') {
         throw new HttpsError('invalid-argument', 'mealId is required.');
@@ -255,6 +271,9 @@ exports.createOrderAndPaymentIntent = onCall(
           orderId,
           mealId,
           clientId: uid,
+          stripeType: error && error.type ? error.type : null,
+          stripeCode: error && error.code ? error.code : null,
+          stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
           error: error instanceof Error ? error.message : String(error),
         });
         throw new HttpsError('internal', 'Unable to create payment intent.');

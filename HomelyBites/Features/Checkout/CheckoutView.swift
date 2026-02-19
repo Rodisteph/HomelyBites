@@ -7,8 +7,17 @@ struct CheckoutView: View {
 
     let onPaymentCompleted: () -> Void
 
-    init(orderId: String, onPaymentCompleted: @escaping () -> Void) {
-        _viewModel = StateObject(wrappedValue: CheckoutViewModel(orderId: orderId))
+    init(
+        orderId: String,
+        clientSecret: String,
+        onPaymentCompleted: @escaping () -> Void
+    ) {
+        _viewModel = StateObject(
+            wrappedValue: CheckoutViewModel(
+                orderId: orderId,
+                clientSecret: clientSecret
+            )
+        )
         self.onPaymentCompleted = onPaymentCompleted
     }
 
