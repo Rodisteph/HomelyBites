@@ -10,7 +10,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Nom")
                         Spacer()
-                        Text(user.fullName)
+                        Text(user.displayName)
                             .foregroundStyle(.secondary)
                     }
 
@@ -19,6 +19,19 @@ struct SettingsView: View {
                         Spacer()
                         Text(user.role.displayTitle)
                             .foregroundStyle(.secondary)
+                    }
+
+                    if user.isHost {
+                        HStack {
+                            Text("Niveau")
+                            Spacer()
+                            Text(user.chefLevel.displayTitle)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        NavigationLink("Modifier le profil host") {
+                            ProfileView()
+                        }
                     }
                 }
             }

@@ -11,6 +11,7 @@
 		0B89EDD32F3F8BFF00E848E4 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD22F3F8BFF00E848E4 /* FirebaseCore */; };
 		0B89EDD52F3F8BFF00E848E4 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD42F3F8BFF00E848E4 /* FirebaseFirestore */; };
 		0B89EDD72F3F8BFF00E848E4 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD62F3F8BFF00E848E4 /* FirebaseFunctions */; };
+		0BC7A1042F71B20000B1AA01 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 0BC7A1052F71B20000B1AA01 /* FirebaseStorage */; };
 		0B89EDDA2F3F8CC200E848E4 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD92F3F8CC200E848E4 /* StripePaymentSheet */; };
 		0B89EDDC2F3F8CC200E848E4 /* StripePayments in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDDB2F3F8CC200E848E4 /* StripePayments */; };
 		0BB9EF3D2F46075300FF52F0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */; };
@@ -53,6 +54,7 @@
 				0B89EDD12F3F8BFF00E848E4 /* FirebaseAuth in Frameworks */,
 				0B89EDD52F3F8BFF00E848E4 /* FirebaseFirestore in Frameworks */,
 				0B89EDD72F3F8BFF00E848E4 /* FirebaseFunctions in Frameworks */,
+				0BC7A1042F71B20000B1AA01 /* FirebaseStorage in Frameworks */,
 				0BC7A1012F70A10000B1AA01 /* GoogleSignIn in Frameworks */,
 				0B89EDDA2F3F8CC200E848E4 /* StripePaymentSheet in Frameworks */,
 			);
@@ -110,6 +112,7 @@
 				0B89EDD22F3F8BFF00E848E4 /* FirebaseCore */,
 				0B89EDD42F3F8BFF00E848E4 /* FirebaseFirestore */,
 				0B89EDD62F3F8BFF00E848E4 /* FirebaseFunctions */,
+				0BC7A1052F71B20000B1AA01 /* FirebaseStorage */,
 				0BC7A1032F70A10000B1AA01 /* GoogleSignIn */,
 				0B89EDD92F3F8CC200E848E4 /* StripePaymentSheet */,
 				0B89EDDB2F3F8CC200E848E4 /* StripePayments */,
@@ -407,6 +410,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0B89EDCF2F3F8BFF00E848E4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFunctions;
+		};
+		0BC7A1052F71B20000B1AA01 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0B89EDCF2F3F8BFF00E848E4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 		0B89EDD92F3F8CC200E848E4 /* StripePaymentSheet */ = {
 			isa = XCSwiftPackageProductDependency;
