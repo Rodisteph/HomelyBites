@@ -66,10 +66,23 @@ final class HostDashboardViewModel: ObservableObject {
         isActivatingPayments = true
         defer { isActivatingPayments = false }
 
+        #if DEBUG
+        debugLog("[HostDashboard][activatePayments] start")
+        #endif
+
         do {
-            _ = try await functionsService.createConnectAccount()
+            let accountId = try await functionsService.createConnectAccount()
+            #if DEBUG
+            debugLog("[HostDashboard][activatePayments] accountId=\(accountId)")
+            #endif
             onboardingURL = try await functionsService.createOnboardingLink()
+            #if DEBUG
+            debugLog("[HostDashboard][activatePayments] onboardingURL=\(onboardingURL?.absoluteString ?? "nil")")
+            #endif
         } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "activatePayments")
+            #endif
             errorMessage = error.localizedDescription
         }
     }
@@ -96,11 +109,18 @@ final class HostDashboardViewModel: ObservableObject {
 
     func requestMealDeletion(at offsets: IndexSet) {
         guard let index = offsets.first, hostMeals.indices.contains(index) else { return }
+        #if DEBUG
+        debugLog("[HostDashboard][deleteMeal] requested index=\(index) mealId=\(hostMeals[index].id)")
+        #endif
         pendingDeletionMeal = hostMeals[index]
     }
 
     func confirmMealDeletion(hostId: String) async {
         guard let meal = pendingDeletionMeal else { return }
+
+        #if DEBUG
+        debugLog("[HostDashboard][deleteMeal] confirm mealId=\(meal.id) hostId=\(hostId)")
+        #endif
 
         isDeletingMeal = true
         defer {
@@ -112,8 +132,34 @@ final class HostDashboardViewModel: ObservableObject {
             try await firestoreService.deleteMeal(mealId: meal.id, hostId: hostId)
             hostMeals.removeAll { $0.id == meal.id }
             successMessage = "Plat supprime."
+            #if DEBUG
+            debugLog("[HostDashboard][deleteMeal] removed local mealId=\(meal.id)")
+            #endif
         } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "deleteMeal")
+            #endif
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        NSLog("%@", message)
+        #endif
+    }
+
+    private func logNSErrorDetails(_ error: Error, context: String) {
+        #if DEBUG
+        let nsError = error as NSError
+        debugLog("[HostDashboard][\(context)] domain=\(nsError.domain) code=\(nsError.code)")
+        debugLog("[HostDashboard][\(context)] localizedDescription=\(nsError.localizedDescription)")
+        debugLog("[HostDashboard][\(context)] userInfo=\(nsError.userInfo)")
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            debugLog("[HostDashboard][\(context)] underlying.domain=\(underlying.domain) code=\(underlying.code)")
+            debugLog("[HostDashboard][\(context)] underlying.localizedDescription=\(underlying.localizedDescription)")
+            debugLog("[HostDashboard][\(context)] underlying.userInfo=\(underlying.userInfo)")
+        }
+        #endif
     }
 }

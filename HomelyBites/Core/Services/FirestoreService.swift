@@ -85,6 +85,9 @@ final class FirestoreService {
     }
 
     func deleteMeal(mealId: String, hostId: String) async throws {
+        #if DEBUG
+        debugLog("[FirestoreService][deleteMeal] start path=meals/\(mealId) hostId=\(hostId)")
+        #endif
         let mealRef = db.collection("meals").document(mealId)
         let snapshot = try await mealRef.getDocumentAsync()
 
@@ -104,10 +107,17 @@ final class FirestoreService {
             throw AppError.invalidInput("Suppression refusee: ce plat n'appartient pas a ce compte host.")
         }
 
-        try await mealRef.deleteAsync()
-        #if DEBUG
-        debugLog("[FirestoreService][deleteMeal] success mealId=\(mealId) hostId=\(hostId)")
-        #endif
+        do {
+            try await mealRef.deleteAsync()
+            #if DEBUG
+            debugLog("[FirestoreService][deleteMeal] success path=meals/\(mealId)")
+            #endif
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "deleteMeal", path: "meals/\(mealId)")
+            #endif
+            throw error
+        }
     }
 
     // MARK: - Orders
@@ -193,6 +203,21 @@ final class FirestoreService {
     private func debugLog(_ message: String) {
         #if DEBUG
         NSLog("%@", message)
+        #endif
+    }
+
+    private func logNSErrorDetails(_ error: Error, context: String, path: String) {
+        #if DEBUG
+        let nsError = error as NSError
+        debugLog("[FirestoreService][\(context)] failed path=\(path)")
+        debugLog("[FirestoreService][\(context)] domain=\(nsError.domain) code=\(nsError.code)")
+        debugLog("[FirestoreService][\(context)] localizedDescription=\(nsError.localizedDescription)")
+        debugLog("[FirestoreService][\(context)] userInfo=\(nsError.userInfo)")
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            debugLog("[FirestoreService][\(context)] underlying.domain=\(underlying.domain) code=\(underlying.code)")
+            debugLog("[FirestoreService][\(context)] underlying.localizedDescription=\(underlying.localizedDescription)")
+            debugLog("[FirestoreService][\(context)] underlying.userInfo=\(underlying.userInfo)")
+        }
         #endif
     }
 }
