@@ -23,7 +23,7 @@ struct HostDashboardView: View {
                     HStack {
                         Text("Stripe status")
                         Spacer()
-                        Text(user.isStripeReady ? "Onboarded" : "Not ready")
+                        Text(user.isStripeReady ? "Ready" : "Not ready")
                             .font(.caption.weight(.semibold))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -47,11 +47,22 @@ struct HostDashboardView: View {
                     }
                     .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isActivatingPayments))
 
-                    Button("Rafraichir profil Stripe") {
+                    Button {
                         Task {
+                            await viewModel.refreshStripeStatus()
                             await session.refreshUserProfile()
                         }
+                    } label: {
+                        if viewModel.isRefreshingStripe {
+                            HStack {
+                                ProgressView()
+                                Text("Verification Stripe...")
+                            }
+                        } else {
+                            Text("Rafraichir profil Stripe")
+                        }
                     }
+                    .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isRefreshingStripe))
                 }
 
                 Section("Meals") {

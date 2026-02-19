@@ -7,6 +7,7 @@ final class HostDashboardViewModel: ObservableObject {
     @Published var hostMeals: [Meal] = []
     @Published var isLoading = false
     @Published var isActivatingPayments = false
+    @Published var isRefreshingStripe = false
     @Published var isDeletingMeal = false
     @Published var onboardingURL: URL?
     @Published var errorMessage: String?
@@ -82,6 +83,28 @@ final class HostDashboardViewModel: ObservableObject {
         } catch {
             #if DEBUG
             logNSErrorDetails(error, context: "activatePayments")
+            #endif
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func refreshStripeStatus() async {
+        isRefreshingStripe = true
+        defer { isRefreshingStripe = false }
+
+        #if DEBUG
+        debugLog("[HostDashboard][refreshStripeStatus] start")
+        #endif
+
+        do {
+            let status = try await functionsService.refreshStripeStatus()
+            successMessage = "Stripe: \(status.stripeStatus)"
+            #if DEBUG
+            debugLog("[HostDashboard][refreshStripeStatus] accountId=\(status.accountId) status=\(status.stripeStatus) onboarded=\(status.stripeOnboarded)")
+            #endif
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "refreshStripeStatus")
             #endif
             errorMessage = error.localizedDescription
         }

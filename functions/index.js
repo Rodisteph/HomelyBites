@@ -84,6 +84,24 @@ assertClient(userData) {
   }
 }
 
+function
+computeStripeStatusFromAccount(account) {
+  const chargesEnabled = Boolean(account ?.charges_enabled);
+  const payoutsEnabled = Boolean(account ?.payouts_enabled);
+  const currentlyDue = Array.isArray(account ?.requirements ?.currently_due) ?
+    account.requirements.currently_due.length : 0;
+
+  if (chargesEnabled && payoutsEnabled) {
+    return 'ready';
+  }
+
+  if (currentlyDue > 0) {
+    return 'pending';
+  }
+
+  return 'not_ready';
+}
+
 exports.createConnectAccount = onCall(
     {
       region: REGION,
@@ -94,40 +112,85 @@ exports.createConnectAccount = onCall(
       logger.info('createConnectAccount called', {
         uid,
       });
-      const {
-        userRef, userData,
-      } = await getUserProfile(uid);
-      assertHost(userData);
+      let step = 'load_profile';
+      try {
+        const {
+          userRef, userData,
+        } = await getUserProfile(uid);
+        step = 'assert_host_role';
+        assertHost(userData);
 
-      if (userData.stripeAccountId) {
-        return {
-          accountId: userData.stripeAccountId,
-          stripeOnboarded: Boolean(userData.stripeOnboarded),
-          alreadyExists: true,
-        };
-      }
+        const existingAccountId = getStringField(userData.stripeAccountId);
+        if (existingAccountId) {
+          const existingStatus = getStringField(userData.stripeStatus) ||
+            (userData.stripeOnboarded === true ? 'ready' : 'not_ready');
 
-      const stripe = getStripeClient();
-      const account = await stripe.accounts.create({
-        type: 'express',
-        email: request.auth.token.email || undefined,
-        metadata: {
+          await userRef.set({
+            stripeStatus: existingStatus,
+            stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {
+            merge: true,
+          });
+
+          logger.info('createConnectAccount returning existing account', {
+            uid,
+            accountId: existingAccountId,
+            stripeStatus: existingStatus,
+          });
+          return {
+            accountId: existingAccountId,
+            stripeOnboarded: userData.stripeOnboarded === true,
+            stripeStatus: existingStatus,
+            alreadyExists: true,
+          };
+        }
+
+        step = 'create_stripe_account';
+        const stripe = getStripeClient();
+        const account = await stripe.accounts.create({
+          type: 'express',
+          email: request.auth.token.email || undefined,
+          metadata: {
+            uid,
+          },
+        });
+
+        step = 'save_user_profile';
+        await userRef.set({
+          stripeAccountId: account.id,
+          stripeOnboarded: false,
+          stripeStatus: 'not_ready',
+          stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+
+        logger.info('createConnectAccount success', {
           uid,
-        },
-      });
+          accountId: account.id,
+          stripeStatus: 'not_ready',
+        });
+        return {
+          accountId: account.id,
+          stripeOnboarded: false,
+          stripeStatus: 'not_ready',
+          alreadyExists: false,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
 
-      await userRef.set({
-        stripeAccountId: account.id,
-        stripeOnboarded: false,
-      }, {
-        merge: true,
-      });
-
-      return {
-        accountId: account.id,
-        stripeOnboarded: false,
-        alreadyExists: false,
-      };
+        logger.error('createConnectAccount failed', {
+          uid,
+          step,
+          stripeType: error && error.type ? error.type : null,
+          stripeCode: error && error.code ? error.code : null,
+          stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError('internal', 'Unable to create Stripe Connect account.');
+      }
     },
 );
 
@@ -141,30 +204,137 @@ exports.createOnboardingLink = onCall(
       logger.info('createOnboardingLink called', {
         uid,
       });
-      const {
-        userData,
-      } = await getUserProfile(uid);
-      assertHost(userData);
+      let step = 'load_profile';
+      try {
+        const {
+          userRef, userData,
+        } = await getUserProfile(uid);
+        step = 'assert_host_role';
+        assertHost(userData);
 
-      if (!userData.stripeAccountId) {
-        throw new HttpsError(
-            'failed-precondition',
-            'Host has no Stripe account yet. Call createConnectAccount first.',
-        );
+        const stripeAccountId = getStringField(userData.stripeAccountId);
+        if (!stripeAccountId) {
+          throw new HttpsError(
+              'failed-precondition',
+              'Host has no Stripe account yet. Call createConnectAccount first.',
+          );
+        }
+
+        step = 'create_onboarding_link';
+        const stripe = getStripeClient();
+        const link = await stripe.accountLinks.create({
+          account: stripeAccountId,
+          refresh_url: ONBOARDING_REFRESH_URL,
+          return_url: ONBOARDING_RETURN_URL,
+          type: 'account_onboarding',
+        });
+
+        step = 'save_onboarding_state';
+        await userRef.set({
+          stripeOnboardingUrl: link.url,
+          stripeOnboardingExpiresAt: link.expires_at,
+          stripeStatus: 'pending',
+          stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+
+        logger.info('createOnboardingLink success', {
+          uid,
+          stripeAccountId,
+          expiresAt: link.expires_at,
+        });
+        return {
+          url: link.url,
+          expiresAt: link.expires_at,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        logger.error('createOnboardingLink failed', {
+          uid,
+          step,
+          stripeType: error && error.type ? error.type : null,
+          stripeCode: error && error.code ? error.code : null,
+          stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError('internal', 'Unable to create Stripe onboarding link.');
       }
+    },
+);
 
-      const stripe = getStripeClient();
-      const link = await stripe.accountLinks.create({
-        account: userData.stripeAccountId,
-        refresh_url: ONBOARDING_REFRESH_URL,
-        return_url: ONBOARDING_RETURN_URL,
-        type: 'account_onboarding',
+exports.refreshStripeStatus = onCall(
+    {
+      region: REGION,
+      secrets: [STRIPE_SECRET_KEY],
+    },
+    async (request) => {
+      const uid = assertAuthenticated(request);
+      logger.info('refreshStripeStatus called', {
+        uid,
       });
 
-      return {
-        url: link.url,
-        expiresAt: link.expires_at,
-      };
+      let step = 'load_profile';
+      try {
+        const {
+          userRef, userData,
+        } = await getUserProfile(uid);
+        step = 'assert_host_role';
+        assertHost(userData);
+
+        const stripeAccountId = getStringField(userData.stripeAccountId);
+        if (!stripeAccountId) {
+          throw new HttpsError('failed-precondition', 'Host has no Stripe account yet.');
+        }
+
+        step = 'retrieve_stripe_account';
+        const stripe = getStripeClient();
+        const account = await stripe.accounts.retrieve(stripeAccountId);
+        const stripeStatus = computeStripeStatusFromAccount(account);
+        const stripeOnboarded = stripeStatus === 'ready';
+        const currentlyDueCount = Array.isArray(account ?.requirements ?.currently_due) ?
+          account.requirements.currently_due.length : 0;
+
+        step = 'save_profile_status';
+        await userRef.set({
+          stripeOnboarded,
+          stripeStatus,
+          stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+
+        logger.info('refreshStripeStatus success', {
+          uid,
+          stripeAccountId,
+          stripeStatus,
+          stripeOnboarded,
+          currentlyDueCount,
+        });
+
+        return {
+          accountId: stripeAccountId,
+          stripeStatus,
+          stripeOnboarded,
+          currentlyDueCount,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        logger.error('refreshStripeStatus failed', {
+          uid,
+          step,
+          stripeType: error && error.type ? error.type : null,
+          stripeCode: error && error.code ? error.code : null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError('internal', 'Unable to refresh Stripe status.');
+      }
     },
 );
 
@@ -723,7 +893,8 @@ applyStripePaymentEventToOrder({
 async function
 handleAccountUpdated(account) {
   const stripeAccountId = account.id;
-  const onboarded = Boolean(account.charges_enabled && account.payouts_enabled);
+  const stripeStatus = computeStripeStatusFromAccount(account);
+  const onboarded = stripeStatus === 'ready';
 
   const snapshot = await db.collection('users')
       .where('stripeAccountId', '==', stripeAccountId)
@@ -739,6 +910,8 @@ handleAccountUpdated(account) {
 
   await snapshot.docs[0].ref.set({
     stripeOnboarded: onboarded,
+    stripeStatus,
+    stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, {
     merge: true,
   });

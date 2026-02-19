@@ -7,6 +7,12 @@ struct OrderCheckoutSession {
     let clientSecret: String
 }
 
+struct StripeAccountStatus {
+    let accountId: String
+    let stripeOnboarded: Bool
+    let stripeStatus: String
+}
+
 final class CloudFunctionsService {
     private let functions = Functions.functions(region: AppConfig.firebaseFunctionsRegion)
     private let auth = Auth.auth()
@@ -29,7 +35,7 @@ final class CloudFunctionsService {
                     #if DEBUG
                     self.logNSErrorDetails(error, context: name)
                     #endif
-                    continuation.resume(throwing: self.mapFunctionsError(error))
+                    continuation.resume(throwing: self.mapFunctionsError(error, functionName: name))
                     return
                 }
                 guard let result else {
@@ -61,6 +67,21 @@ final class CloudFunctionsService {
             throw AppError.invalidResponse
         }
         return url
+    }
+
+    func refreshStripeStatus() async throws -> StripeAccountStatus {
+        let response = try await call("refreshStripeStatus", data: [:])
+        guard let payload = response as? [String: Any],
+              let accountId = payload["accountId"] as? String,
+              let stripeOnboarded = payload["stripeOnboarded"] as? Bool,
+              let stripeStatus = payload["stripeStatus"] as? String else {
+            throw AppError.invalidResponse
+        }
+        return StripeAccountStatus(
+            accountId: accountId,
+            stripeOnboarded: stripeOnboarded,
+            stripeStatus: stripeStatus
+        )
     }
 
     func createOrderAndPaymentIntent(
@@ -120,21 +141,33 @@ final class CloudFunctionsService {
         return String(describing: safe)
     }
 
-    private func mapFunctionsError(_ error: Error) -> Error {
+    private func mapFunctionsError(_ error: Error, functionName: String) -> Error {
         let nsError = error as NSError
         guard nsError.domain == FunctionsErrorDomain,
               let code = FunctionsErrorCode(rawValue: nsError.code) else {
             return error
         }
 
-        let functionMessage = extractFunctionsMessage(from: nsError) ?? nsError.localizedDescription
+        let rawMessage = extractFunctionsMessage(from: nsError)
+            ?? (nsError.userInfo[NSLocalizedDescriptionKey] as? String)
+            ?? nsError.localizedDescription
+        let functionMessage = normalizedFunctionsMessage(
+            rawMessage: rawMessage,
+            code: code,
+            functionName: functionName
+        )
 
         switch code {
         case .unauthenticated:
             return AppError.missingAuth
-        case .invalidArgument, .failedPrecondition, .permissionDenied, .notFound:
-            return AppError.invalidInput(functionMessage)
-        case .internal:
+        case .invalidArgument,
+                .failedPrecondition,
+                .permissionDenied,
+                .notFound,
+                .internal,
+                .unavailable,
+                .dataLoss,
+                .unknown:
             return AppError.invalidInput(functionMessage)
         default:
             return AppError.invalidInput(functionMessage)
@@ -146,15 +179,92 @@ final class CloudFunctionsService {
             return details
         }
         if let details = nsError.userInfo[FunctionsErrorDetailsKey] as? [String: Any],
-           let message = details["message"] as? String,
-           !message.isEmpty {
+           let message = extractMessage(from: details) {
             return message
         }
-        if let localized = nsError.userInfo[NSLocalizedDescriptionKey] as? String,
-           !localized.isEmpty {
-            return localized
+        if let details = nsError.userInfo[FunctionsErrorDetailsKey] as? [[String: Any]],
+           let first = details.first,
+           let message = extractMessage(from: first) {
+            return message
+        }
+        if let failureReason = nsError.userInfo[NSLocalizedFailureReasonErrorKey] as? String,
+           !failureReason.isEmpty {
+            return failureReason
+        }
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError,
+           let message = extractFunctionsMessage(from: underlying) {
+            return message
         }
         return nil
+    }
+
+    private func extractMessage(from details: [String: Any]) -> String? {
+        for key in ["message", "error", "description", "reason"] {
+            if let value = details[key] as? String, !value.isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private func normalizedFunctionsMessage(
+        rawMessage: String,
+        code: FunctionsErrorCode,
+        functionName: String
+    ) -> String {
+        if !isGenericFunctionsMessage(rawMessage, code: code) {
+            return rawMessage
+        }
+        return fallbackFunctionsMessage(code: code, functionName: functionName)
+    }
+
+    private func isGenericFunctionsMessage(_ message: String, code: FunctionsErrorCode) -> Bool {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return true
+        }
+        let upper = trimmed.uppercased()
+        if upper == "INTERNAL" || upper == "UNKNOWN" || upper == "UNAUTHENTICATED" {
+            return true
+        }
+        if upper == String(describing: code).uppercased() {
+            return true
+        }
+        if upper == "THE OPERATION COULDN'T BE COMPLETED. (INTERNAL.)" {
+            return true
+        }
+        return false
+    }
+
+    private func fallbackFunctionsMessage(code: FunctionsErrorCode, functionName: String) -> String {
+        switch (functionName, code) {
+        case ("createConnectAccount", .failedPrecondition):
+            return "Stripe n'est pas configure sur le backend (secret manquant) ou le profil host est incomplet."
+        case ("createConnectAccount", .permissionDenied):
+            return "Compte host requis pour activer les paiements."
+        case ("createConnectAccount", .internal):
+            return "Erreur interne pendant la creation du compte Stripe. Verifie les logs Functions createConnectAccount."
+        case ("createOnboardingLink", .failedPrecondition):
+            return "Compte Stripe introuvable ou onboarding non initialise. Active d'abord les paiements."
+        case ("refreshStripeStatus", .failedPrecondition):
+            return "Aucun compte Stripe associe a ce host."
+        case (_, .unauthenticated):
+            return AppError.missingAuth.localizedDescription
+        case (_, .permissionDenied):
+            return "Permission refusee."
+        case (_, .notFound):
+            return "Ressource introuvable."
+        case (_, .failedPrecondition):
+            return "Condition invalide cote serveur."
+        case (_, .invalidArgument):
+            return "Donnees invalides envoyees au serveur."
+        case (_, .internal):
+            return "Erreur interne Cloud Function. Consulte les logs Firebase Functions."
+        case (_, .unavailable):
+            return "Service temporairement indisponible. Reessaie."
+        default:
+            return "Erreur Cloud Function (\(code.rawValue))."
+        }
     }
 
     private func debugLog(_ message: String) {
