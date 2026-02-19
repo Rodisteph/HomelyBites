@@ -3,7 +3,7 @@ import Foundation
 import FirebaseFirestore
 
 final class FirestoreService {
-    private let db = Firestore.firestore()
+    private lazy var db = Firestore.firestore()
 
     // MARK: - Users
 
@@ -19,6 +19,19 @@ final class FirestoreService {
 
     func fetchMeals() async throws -> [Meal] {
         let snapshot = try await db.collection("meals").getDocumentsAsync()
+        let meals = snapshot.documents.compactMap { Meal(document: $0) }
+
+        return meals.sorted {
+            ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
+        }
+    }
+
+    func fetchMeals(hostId: String) async throws -> [Meal] {
+        let snapshot = try await db
+            .collection("meals")
+            .whereField("hostId", isEqualTo: hostId)
+            .getDocumentsAsync()
+
         let meals = snapshot.documents.compactMap { Meal(document: $0) }
 
         return meals.sorted {
@@ -71,38 +84,43 @@ final class FirestoreService {
         )
     }
 
-    // MARK: - Orders
+    func deleteMeal(mealId: String, hostId: String) async throws {
+        #if DEBUG
+        debugLog("[FirestoreService][deleteMeal] start path=meals/\(mealId) hostId=\(hostId)")
+        #endif
+        let mealRef = db.collection("meals").document(mealId)
+        let snapshot = try await mealRef.getDocumentAsync()
 
-    func createOrder(
-        meal: Meal,
-        clientId: String,
-        hostStripeAccountId: String,
-        portions: Int,
-        note: String
-    ) async throws -> String {
+        guard snapshot.exists else {
+            #if DEBUG
+            debugLog("[FirestoreService][deleteMeal] meal already deleted mealId=\(mealId)")
+            #endif
+            return
+        }
 
-        let amountCents = meal.priceCents * portions
-        let orderRef = db.collection("orders").document()
+        guard let data = snapshot.data(),
+              let ownerId = data["hostId"] as? String else {
+            throw AppError.invalidResponse
+        }
 
-        let order = Order(
-            id: orderRef.documentID,
-            mealId: meal.id,
-            clientId: clientId,
-            hostId: meal.hostId,
-            hostStripeAccountId: hostStripeAccountId,
-            portions: portions,
-            note: note,
-            status: .pending,
-            paymentStatus: .requires_payment,
-            amountCents: amountCents,
-            currency: "eur",
-            paymentIntentId: nil,
-            createdAt: nil
-        )
+        guard ownerId == hostId else {
+            throw AppError.invalidInput("Suppression refusee: ce plat n'appartient pas a ce compte host.")
+        }
 
-        try await orderRef.setDataAsync(order.toFirestore(), merge: true)
-        return orderRef.documentID
+        do {
+            try await mealRef.deleteAsync()
+            #if DEBUG
+            debugLog("[FirestoreService][deleteMeal] success path=meals/\(mealId)")
+            #endif
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "deleteMeal", path: "meals/\(mealId)")
+            #endif
+            throw error
+        }
     }
+
+    // MARK: - Orders
 
     func fetchClientOrders(clientId: String) async throws -> [Order] {
         let snapshot = try await db
@@ -182,9 +200,24 @@ final class FirestoreService {
             }
     }
 
-    func updateOrderStatus(orderId: String, status: OrderStatus) async throws {
-        try await db.collection("orders")
-            .document(orderId)
-            .updateDataAsync(["status": status.rawValue])
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        NSLog("%@", message)
+        #endif
+    }
+
+    private func logNSErrorDetails(_ error: Error, context: String, path: String) {
+        #if DEBUG
+        let nsError = error as NSError
+        debugLog("[FirestoreService][\(context)] failed path=\(path)")
+        debugLog("[FirestoreService][\(context)] domain=\(nsError.domain) code=\(nsError.code)")
+        debugLog("[FirestoreService][\(context)] localizedDescription=\(nsError.localizedDescription)")
+        debugLog("[FirestoreService][\(context)] userInfo=\(nsError.userInfo)")
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            debugLog("[FirestoreService][\(context)] underlying.domain=\(underlying.domain) code=\(underlying.code)")
+            debugLog("[FirestoreService][\(context)] underlying.localizedDescription=\(underlying.localizedDescription)")
+            debugLog("[FirestoreService][\(context)] underlying.userInfo=\(underlying.userInfo)")
+        }
+        #endif
     }
 }

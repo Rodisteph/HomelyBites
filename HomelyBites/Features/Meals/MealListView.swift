@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MealListView: View {
+    @EnvironmentObject private var container: AppContainer
     @EnvironmentObject private var session: SessionViewModel
     @StateObject private var viewModel = MealListViewModel()
 
@@ -8,6 +9,7 @@ struct MealListView: View {
         List {
             if viewModel.isLoading && viewModel.meals.isEmpty {
                 ProgressView("Chargement des repas...")
+                    .tint(AppColors.primary)
             } else if viewModel.meals.isEmpty {
                 ContentUnavailableView(
                     "Aucun repas",
@@ -17,13 +19,21 @@ struct MealListView: View {
             } else {
                 ForEach(viewModel.meals) { meal in
                     NavigationLink {
-                        MealDetailView(meal: meal)
+                        MealDetailView(
+                            meal: meal,
+                            functionsService: container.cloudFunctionsService
+                        )
                     } label: {
                         MealRowView(meal: meal)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(AppColors.background)
         .navigationTitle("Repas")
         .refreshable {
             await viewModel.loadMeals()
@@ -57,14 +67,16 @@ private struct MealRowView: View {
             HStack {
                 Text(meal.title)
                     .font(.headline)
+                    .foregroundStyle(AppColors.textPrimary)
                 Spacer()
                 Text(meal.priceCents.asEuro())
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.primary)
             }
 
             Text(meal.description)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppColors.textSecondary)
                 .lineLimit(2)
 
             HStack {
@@ -73,7 +85,7 @@ private struct MealRowView: View {
                 Label("\(meal.availablePortions)", systemImage: "shippingbox")
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppColors.textSecondary)
 
             if !meal.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -83,12 +95,13 @@ private struct MealRowView: View {
                                 .font(.caption)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.gray.opacity(0.15), in: Capsule())
+                                .background(AppColors.primary.opacity(0.12), in: Capsule())
                         }
                     }
                 }
             }
         }
         .padding(.vertical, 4)
+        .appCard()
     }
 }
