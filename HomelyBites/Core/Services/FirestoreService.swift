@@ -15,6 +15,42 @@ final class FirestoreService {
         return user
     }
 
+    func updateUserProfile(
+        uid: String,
+        displayName: String,
+        bio: String,
+        chefLevel: ChefLevel,
+        photoURL: String?
+    ) async throws {
+        var payload: [String: Any] = [
+            "displayName": displayName,
+            "fullName": displayName,
+            "bio": bio,
+            "chefLevel": chefLevel.rawValue,
+            "updatedAt": FieldValue.serverTimestamp()
+        ]
+
+        if let photoURL, !photoURL.isEmpty {
+            payload["photoURL"] = photoURL
+        }
+
+        #if DEBUG
+        debugLog("[FirestoreService][updateUserProfile] start users/\(uid)")
+        #endif
+
+        do {
+            try await db.collection("users").document(uid).setDataAsync(payload, merge: true)
+            #if DEBUG
+            debugLog("[FirestoreService][updateUserProfile] success users/\(uid)")
+            #endif
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "updateUserProfile", path: "users/\(uid)")
+            #endif
+            throw error
+        }
+    }
+
     // MARK: - Meals
 
     func fetchMeals() async throws -> [Meal] {
@@ -98,9 +134,19 @@ final class FirestoreService {
             return
         }
 
-        guard let data = snapshot.data(),
-              let ownerId = data["hostId"] as? String else {
+        guard let data = snapshot.data() else {
             throw AppError.invalidResponse
+        }
+
+        let ownerId = (data["hostId"] as? String)
+            ?? (data["ownerId"] as? String)
+            ?? (data["userId"] as? String)
+
+        guard let ownerId, !ownerId.isEmpty else {
+            #if DEBUG
+            debugLog("[FirestoreService][deleteMeal] owner field missing for mealId=\(mealId) keys=\(Array(data.keys))")
+            #endif
+            throw AppError.invalidInput("Suppression impossible: proprietaire du plat introuvable.")
         }
 
         guard ownerId == hostId else {

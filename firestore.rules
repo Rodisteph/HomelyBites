@@ -27,6 +27,14 @@ service cloud.firestore {
       return request.resource.data.paymentStatus == resource.data.paymentStatus;
     }
 
+    function isMealOwner() {
+      return isSignedIn()
+        && (
+          (resource.data.hostId is string && resource.data.hostId == request.auth.uid)
+          || (resource.data.ownerId is string && resource.data.ownerId == request.auth.uid)
+        );
+    }
+
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create, update, delete: if isOwner(uid);
@@ -43,12 +51,10 @@ service cloud.firestore {
         && request.resource.data.availablePortions is int
         && request.resource.data.availablePortions > 0;
 
-      allow update: if isSignedIn()
-        && resource.data.hostId == request.auth.uid
+      allow update: if isMealOwner()
         && request.resource.data.hostId == resource.data.hostId;
 
-      allow delete: if isSignedIn()
-        && resource.data.hostId == request.auth.uid;
+      allow delete: if isMealOwner();
     }
 
     match /orders/{orderId} {
