@@ -18,7 +18,10 @@ final class FirestoreService {
     // MARK: - Meals
 
     func fetchMeals() async throws -> [Meal] {
-        let snapshot = try await db.collection("meals").getDocumentsAsync()
+        let snapshot = try await db
+            .collection("meals")
+            .whereField("isPublic", isEqualTo: true)
+            .getDocumentsAsync()
         let meals = snapshot.documents.compactMap { Meal(document: $0) }
 
         return meals.sorted {
@@ -45,7 +48,8 @@ final class FirestoreService {
         description: String,
         priceCents: Int,
         availablePortions: Int,
-        tags: [String]
+        tags: [String],
+        isPublic: Bool = false
     ) async throws {
         let docRef = db.collection("meals").document()
 
@@ -58,6 +62,7 @@ final class FirestoreService {
             hostId: host.id,
             hostName: host.fullName,
             tags: tags,
+            isPublic: isPublic,
             createdAt: nil
         )
 
@@ -71,7 +76,8 @@ final class FirestoreService {
             description: "Lasagne boeuf, bechamel, portion genereuse.",
             priceCents: 1200,
             availablePortions: 6,
-            tags: ["italian", "family"]
+            tags: ["italian", "family"],
+            isPublic: true
         )
 
         try await createMeal(
@@ -80,8 +86,13 @@ final class FirestoreService {
             description: "Semoule fine, legumes frais et pois chiches.",
             priceCents: 980,
             availablePortions: 8,
-            tags: ["veggie", "healthy"]
+            tags: ["veggie", "healthy"],
+            isPublic: true
         )
+    }
+
+    func updateMealVisibility(mealId: String, isPublic: Bool) async throws {
+        try await db.collection("meals").document(mealId).updateDataAsync(["isPublic": isPublic])
     }
 
     func deleteMeal(mealId: String, hostId: String) async throws {

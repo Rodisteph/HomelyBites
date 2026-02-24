@@ -87,6 +87,22 @@ struct HostDashboardView: View {
                                 Text("Portions: \(meal.availablePortions)")
                                     .font(.caption)
                                     .foregroundStyle(AppColors.textSecondary)
+                                HStack {
+                                    Text(meal.isPublic ? "Public" : "Prive")
+                                        .font(.caption.weight(.semibold))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(meal.isPublic ? AppColors.success.opacity(0.18) : AppColors.warning.opacity(0.18), in: Capsule())
+                                        .foregroundStyle(meal.isPublic ? AppColors.success : AppColors.warning)
+                                    Spacer()
+                                    Button(meal.isPublic ? "Depublier" : "Publier") {
+                                        Task {
+                                            await viewModel.toggleMealVisibility(meal: meal)
+                                        }
+                                    }
+                                    .font(.caption)
+                                    .buttonStyle(.bordered)
+                                }
                             }
                             .padding(.vertical, 4)
                             .appCard()

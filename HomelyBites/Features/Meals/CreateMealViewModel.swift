@@ -7,6 +7,7 @@ final class CreateMealViewModel: ObservableObject {
     @Published var priceText = ""
     @Published var availablePortions = 1
     @Published var tagsText = ""
+    @Published var isPublic = false
     @Published var isSaving = false
     @Published var errorMessage: String?
     @Published var didSave = false
@@ -45,7 +46,8 @@ final class CreateMealViewModel: ObservableObject {
                 description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 priceCents: priceCents,
                 availablePortions: availablePortions,
-                tags: tags
+                tags: tags,
+                isPublic: isPublic
             )
             didSave = true
         } catch {

@@ -12,6 +12,7 @@ struct Meal: Identifiable {
     var hostId: String
     var hostName: String
     var tags: [String]
+    var isPublic: Bool
     var createdAt: Timestamp?
 
 }
@@ -28,6 +29,7 @@ extension Meal {
         self.hostId = data["hostId"] as? String ?? ""
         self.hostName = data["hostName"] as? String ?? ""
         self.tags = data["tags"] as? [String] ?? []
+        self.isPublic = data["isPublic"] as? Bool ?? false
         self.createdAt = data["createdAt"] as? Timestamp
     }
 
@@ -40,6 +42,7 @@ extension Meal {
             "hostId": hostId,
             "hostName": hostName,
             "tags": tags,
+            "isPublic": isPublic,
             "createdAt": FieldValue.serverTimestamp()
         ]
     }

@@ -18,6 +18,7 @@ struct CreateMealView: View {
                     Stepper("Portions disponibles: \(viewModel.availablePortions)", value: $viewModel.availablePortions, in: 1...500)
                     TextField("Tags (comma separated)", text: $viewModel.tagsText)
                         .textInputAutocapitalization(.never)
+                    Toggle("Publier ce repas", isOn: $viewModel.isPublic)
                 }
             }
             .navigationTitle("Creer un meal")

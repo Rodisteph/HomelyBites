@@ -143,6 +143,19 @@ final class HostDashboardViewModel: ObservableObject {
         }
     }
 
+    func toggleMealVisibility(meal: Meal) async {
+        let newValue = !meal.isPublic
+        do {
+            try await firestoreService.updateMealVisibility(mealId: meal.id, isPublic: newValue)
+            if let index = hostMeals.firstIndex(where: { $0.id == meal.id }) {
+                hostMeals[index].isPublic = newValue
+            }
+            successMessage = newValue ? "Plat publie." : "Plat depublie."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func debugLog(_ message: String) {
         #if DEBUG
         NSLog("%@", message)
