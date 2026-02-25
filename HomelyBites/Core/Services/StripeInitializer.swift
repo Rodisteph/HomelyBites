@@ -3,11 +3,11 @@ import StripePayments
 
 enum StripeInitializer {
     static func configure() {
-        let key = AppConfig.stripePublishableKey
-        if key.isEmpty {
+        let publishableKey = Bundle.main.infoDictionary?["STRIPE_PUBLISHABLE_KEY"] as? String ?? ""
+        if publishableKey.isEmpty || publishableKey.hasPrefix("$(") {
             assertionFailure(AppError.stripePublishableKeyMissing.localizedDescription)
             return
         }
-        STPAPIClient.shared.publishableKey = key
+        StripeAPI.defaultPublishableKey = publishableKey
     }
 }

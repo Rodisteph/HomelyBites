@@ -72,11 +72,18 @@ final class HostDashboardViewModel: ObservableObject {
         #endif
 
         do {
-            let accountId = try await functionsService.createConnectAccount()
+            let session = try await functionsService.createConnectAccount()
             #if DEBUG
-            debugLog("[HostDashboard][activatePayments] accountId=\(accountId)")
+            debugLog("[HostDashboard][activatePayments] accountId=\(session.accountId) status=\(session.status) alreadyExists=\(session.alreadyExists)")
             #endif
-            onboardingURL = try await functionsService.createOnboardingLink()
+
+            if let onboardingURLFromSession = session.onboardingURL {
+                onboardingURL = onboardingURLFromSession
+            } else if session.status != "enabled" {
+                onboardingURL = try await functionsService.createOnboardingLink()
+            } else {
+                successMessage = "Paiements deja actifs."
+            }
             #if DEBUG
             debugLog("[HostDashboard][activatePayments] onboardingURL=\(onboardingURL?.absoluteString ?? "nil")")
             #endif
@@ -152,8 +159,11 @@ final class HostDashboardViewModel: ObservableObject {
         }
 
         do {
-            try await firestoreService.deleteMeal(mealId: meal.id, hostId: hostId)
+            try await functionsService.deleteMeal(mealId: meal.id)
             hostMeals.removeAll { $0.id == meal.id }
+            if !hostId.isEmpty {
+                hostMeals = try await firestoreService.fetchMeals(hostId: hostId)
+            }
             successMessage = "Plat supprime."
             #if DEBUG
             debugLog("[HostDashboard][deleteMeal] removed local mealId=\(meal.id)")

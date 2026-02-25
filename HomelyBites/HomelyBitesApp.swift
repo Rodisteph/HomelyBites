@@ -1,5 +1,9 @@
+// PREREQUIS : Signing & Capabilities -> Apple Pay -> ajouter merchant.com.homelybites
+// PREREQUIS : Apple Developer Portal -> Certificates -> Merchant IDs -> creer merchant.com.homelybites
+// PREREQUIS : Stripe Dashboard -> Settings -> Apple Pay -> uploader certificat Apple
+// PREREQUIS : Tester sur device reel uniquement (Apple Pay = non disponible sur simulateur)
 import SwiftUI
-import StripeCore
+import StripePaymentSheet
 import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
@@ -21,7 +25,8 @@ struct HomelyBitesApp: App {
         Self.runDebugAuthResetIfRequested()
         Self.runDebugSignInProbeIfRequested()
         Self.runDebugSignUpProbeIfRequested()
-        StripeInitializer.configure()
+        let key = Bundle.main.infoDictionary?["STRIPE_PUBLISHABLE_KEY"] as? String ?? ""
+        StripeAPI.defaultPublishableKey = key
         let container = AppContainer()
         _container = StateObject(wrappedValue: container)
         _sessionViewModel = StateObject(wrappedValue: container.makeSessionViewModel())

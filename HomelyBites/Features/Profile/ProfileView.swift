@@ -7,6 +7,8 @@ struct ProfileView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
 
     var body: some View {
+        let uploadTitle = viewModel.isUploadingPhoto ? "Upload..." : "Choisir une photo"
+
         Form {
             Section("Photo") {
                 HStack(spacing: 16) {
@@ -16,7 +18,7 @@ struct ProfileView: View {
                             selection: $selectedPhotoItem,
                             matching: .images
                         ) {
-                            Text(viewModel.isUploadingPhoto ? "Upload..." : "Choisir une photo")
+                            Text(uploadTitle)
                         }
                         .disabled(viewModel.isUploadingPhoto)
 
@@ -28,7 +30,7 @@ struct ProfileView: View {
             }
 
             Section("Profil host") {
-                TextField("Nom affiche", text: $viewModel.displayName)
+                TextField("Nom affiche", text: $viewModel.fullName)
                     .appTextFieldStyle()
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -50,6 +52,36 @@ struct ProfileView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            }
+
+            if session.appUser?.role == .host {
+                Section("HACCP") {
+                    if viewModel.hasAcceptedHaccp {
+                        Text("Validation HACCP active (version \(viewModel.haccpVersion)).")
+                            .foregroundStyle(AppColors.success)
+                    } else {
+                        Text("Validation HACCP requise avant publication d'un repas.")
+                            .foregroundStyle(AppColors.warning)
+                    }
+
+                    Button {
+                        Task {
+                            await viewModel.acknowledgeHaccp()
+                            await session.refreshUserProfile()
+                        }
+                    } label: {
+                        if viewModel.isAcknowledgingHaccp {
+                            HStack {
+                                ProgressView()
+                                Text("Validation...")
+                            }
+                        } else {
+                            Text("J'ai pris connaissance des regles HACCP")
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isAcknowledgingHaccp))
+                    .disabled(viewModel.isAcknowledgingHaccp || viewModel.hasAcceptedHaccp)
+                }
             }
 
             Section {

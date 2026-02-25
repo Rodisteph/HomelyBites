@@ -1,6 +1,11 @@
 import Foundation
 import FirebaseStorage
 
+struct UploadedMealPhoto {
+    let downloadURL: String
+    let storagePath: String
+}
+
 final class StorageService {
     private lazy var storage = Storage.storage()
 
@@ -25,6 +30,35 @@ final class StorageService {
         } catch {
             #if DEBUG
             logNSErrorDetails(error, context: "uploadProfilePhoto", path: path)
+            #endif
+            throw error
+        }
+    }
+
+    func uploadMealPhoto(hostId: String, mealId: String, imageData: Data) async throws -> UploadedMealPhoto {
+        let fileName = "\(UUID().uuidString).jpg"
+        let path = "mealPhotos/\(hostId)/\(mealId)/\(fileName)"
+        let reference = storage.reference().child(path)
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+
+        #if DEBUG
+        debugLog("[StorageService][uploadMealPhoto] start path=\(path) size=\(imageData.count)")
+        #endif
+
+        do {
+            _ = try await upload(reference: reference, data: imageData, metadata: metadata)
+            let url = try await downloadURL(reference: reference)
+            #if DEBUG
+            debugLog("[StorageService][uploadMealPhoto] success path=\(path)")
+            #endif
+            return UploadedMealPhoto(
+                downloadURL: url.absoluteString,
+                storagePath: path
+            )
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "uploadMealPhoto", path: path)
             #endif
             throw error
         }

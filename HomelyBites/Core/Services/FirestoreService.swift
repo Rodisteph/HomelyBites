@@ -1,4 +1,3 @@
-
 import Foundation
 import FirebaseFirestore
 
@@ -8,31 +7,32 @@ final class FirestoreService {
     // MARK: - Users
 
     func fetchUser(uid: String) async throws -> AppUser {
-        let snapshot = try await db.collection("users").document(uid).getDocumentAsync()
-        guard snapshot.exists, let user = AppUser(document: snapshot) else {
-            throw AppError.missingUserProfile
-        }
+        var user = try await db.collection("users").document(uid).getDocument(as: AppUser.self)
+        if user.id.isEmpty { user.id = uid }
         return user
     }
 
     func updateUserProfile(
         uid: String,
-        displayName: String,
-        bio: String,
-        chefLevel: ChefLevel,
+        fullName: String,
+        bio: String?,
+        chefLevel: String?,
         photoURL: String?
     ) async throws {
+        let cleanedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         var payload: [String: Any] = [
-            "displayName": displayName,
-            "fullName": displayName,
-            "bio": bio,
-            "chefLevel": chefLevel.rawValue,
+            "fullName": cleanedName,
             "updatedAt": FieldValue.serverTimestamp()
         ]
 
-        if let photoURL, !photoURL.isEmpty {
-            payload["photoURL"] = photoURL
-        }
+        let cleanedBio = bio?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        payload["bio"] = cleanedBio.isEmpty ? FieldValue.delete() : cleanedBio
+
+        let cleanedChefLevel = chefLevel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        payload["chefLevel"] = cleanedChefLevel.isEmpty ? FieldValue.delete() : cleanedChefLevel
+
+        let cleanedPhotoURL = photoURL?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        payload["photoURL"] = cleanedPhotoURL.isEmpty ? FieldValue.delete() : cleanedPhotoURL
 
         #if DEBUG
         debugLog("[FirestoreService][updateUserProfile] start users/\(uid)")
@@ -55,8 +55,7 @@ final class FirestoreService {
 
     func fetchMeals() async throws -> [Meal] {
         let snapshot = try await db.collection("meals").getDocumentsAsync()
-        let meals = snapshot.documents.compactMap { Meal(document: $0) }
-
+        let meals = try snapshot.documents.map { try decodeMealDocument($0) }
         return meals.sorted {
             ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
         }
@@ -68,7 +67,7 @@ final class FirestoreService {
             .whereField("hostId", isEqualTo: hostId)
             .getDocumentsAsync()
 
-        let meals = snapshot.documents.compactMap { Meal(document: $0) }
+        let meals = try snapshot.documents.map { try decodeMealDocument($0) }
 
         return meals.sorted {
             ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
@@ -81,8 +80,9 @@ final class FirestoreService {
         description: String,
         priceCents: Int,
         availablePortions: Int,
-        tags: [String]
-    ) async throws {
+        tags: [String],
+        serviceMode: MealServiceMode
+    ) async throws -> String {
         let docRef = db.collection("meals").document()
 
         let meal = Meal(
@@ -94,29 +94,64 @@ final class FirestoreService {
             hostId: host.id,
             hostName: host.fullName,
             tags: tags,
+            serviceMode: serviceMode,
+            location: GeoPoint(latitude: 52.3676, longitude: 4.9041),
+            locationName: "Amsterdam",
+            city: "Amsterdam",
             createdAt: nil
         )
 
-        try await docRef.setDataAsync(meal.toFirestore(), merge: true)
+        try await docRef.setData(from: meal)
+        return docRef.documentID
+    }
+
+    func setMealPhoto(mealId: String, imageURL: String, imagePath: String) async throws {
+        let trimmedURL = imageURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPath = imagePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedURL.isEmpty, !trimmedPath.isEmpty else {
+            throw AppError.invalidInput("Photo repas invalide.")
+        }
+
+        #if DEBUG
+        debugLog("[FirestoreService][setMealPhoto] start mealId=\(mealId)")
+        #endif
+
+        do {
+            try await db.collection("meals").document(mealId).setDataAsync([
+                "imageURL": trimmedURL,
+                "imagePath": trimmedPath,
+                "updatedAt": FieldValue.serverTimestamp()
+            ], merge: true)
+            #if DEBUG
+            debugLog("[FirestoreService][setMealPhoto] success mealId=\(mealId)")
+            #endif
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "setMealPhoto", path: "meals/\(mealId)")
+            #endif
+            throw error
+        }
     }
 
     func createDemoMeals(host: AppUser) async throws {
-        try await createMeal(
+        _ = try await createMeal(
             host: host,
             title: "Lasagna Maison",
             description: "Lasagne boeuf, bechamel, portion genereuse.",
             priceCents: 1200,
             availablePortions: 6,
-            tags: ["italian", "family"]
+            tags: ["italian", "family"],
+            serviceMode: .onSite
         )
 
-        try await createMeal(
+        _ = try await createMeal(
             host: host,
             title: "Couscous Veggie",
             description: "Semoule fine, legumes frais et pois chiches.",
             priceCents: 980,
             availablePortions: 8,
-            tags: ["veggie", "healthy"]
+            tags: ["veggie", "healthy"],
+            serviceMode: .onSite
         )
     }
 
@@ -134,22 +169,15 @@ final class FirestoreService {
             return
         }
 
-        guard let data = snapshot.data() else {
-            throw AppError.invalidResponse
+        var meal = try snapshot.data(as: Meal.self)
+        if meal.id.isEmpty {
+            meal.id = snapshot.documentID
         }
-
-        let ownerId = (data["hostId"] as? String)
-            ?? (data["ownerId"] as? String)
-            ?? (data["userId"] as? String)
-
-        guard let ownerId, !ownerId.isEmpty else {
-            #if DEBUG
-            debugLog("[FirestoreService][deleteMeal] owner field missing for mealId=\(mealId) keys=\(Array(data.keys))")
-            #endif
+        guard !meal.hostId.isEmpty else {
             throw AppError.invalidInput("Suppression impossible: proprietaire du plat introuvable.")
         }
 
-        guard ownerId == hostId else {
+        guard meal.hostId == hostId else {
             throw AppError.invalidInput("Suppression refusee: ce plat n'appartient pas a ce compte host.")
         }
 
@@ -169,12 +197,10 @@ final class FirestoreService {
     // MARK: - Orders
 
     func fetchClientOrders(clientId: String) async throws -> [Order] {
-        let snapshot = try await db
+        let orders = try await db
             .collection("orders")
             .whereField("clientId", isEqualTo: clientId)
-            .getDocumentsAsync()
-
-        let orders = snapshot.documents.compactMap { Order(document: $0) }
+            .getDocuments(as: Order.self)
 
         return orders.sorted {
             ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
@@ -182,12 +208,10 @@ final class FirestoreService {
     }
 
     func fetchHostOrders(hostId: String) async throws -> [Order] {
-        let snapshot = try await db
+        let orders = try await db
             .collection("orders")
             .whereField("hostId", isEqualTo: hostId)
-            .getDocumentsAsync()
-
-        let orders = snapshot.documents.compactMap { Order(document: $0) }
+            .getDocuments(as: Order.self)
 
         return orders.sorted {
             ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
@@ -210,13 +234,16 @@ final class FirestoreService {
                     return
                 }
 
-                let orders = snapshot.documents
-                    .compactMap { Order(document: $0) }
-                    .sorted {
-                        ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
-                    }
-
-                onUpdate(.success(orders))
+                do {
+                    let orders = try snapshot.documents
+                        .map { try $0.data(as: Order.self) }
+                        .sorted {
+                            ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
+                        }
+                    onUpdate(.success(orders))
+                } catch {
+                    onUpdate(.failure(error))
+                }
             }
     }
 
@@ -236,13 +263,16 @@ final class FirestoreService {
                     return
                 }
 
-                let orders = snapshot.documents
-                    .compactMap { Order(document: $0) }
-                    .sorted {
-                        ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
-                    }
-
-                onUpdate(.success(orders))
+                do {
+                    let orders = try snapshot.documents
+                        .map { try $0.data(as: Order.self) }
+                        .sorted {
+                            ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
+                        }
+                    onUpdate(.success(orders))
+                } catch {
+                    onUpdate(.failure(error))
+                }
             }
     }
 
@@ -265,5 +295,12 @@ final class FirestoreService {
             debugLog("[FirestoreService][\(context)] underlying.userInfo=\(underlying.userInfo)")
         }
         #endif
+    }
+
+    private func decodeMealDocument(_ document: QueryDocumentSnapshot) throws -> Meal {
+        var meal = try document.data(as: Meal.self)
+        // Always trust Firestore documentID for destructive operations (delete/update).
+        meal.id = document.documentID
+        return meal
     }
 }

@@ -3,32 +3,42 @@ import UIKit
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
-    @Published var displayName = ""
+    @Published var fullName = ""
     @Published var bio = ""
     @Published var chefLevel: ChefLevel = .beginner
     @Published var photoURL: String?
+    @Published var hasAcceptedHaccp = false
+    @Published var haccpVersion = "2026-02"
     @Published var selectedImage: UIImage?
     @Published var isSaving = false
     @Published var isUploadingPhoto = false
+    @Published var isAcknowledgingHaccp = false
     @Published var errorMessage: String?
     @Published var successMessage: String?
 
     private let firestoreService: FirestoreService
     private let storageService: StorageService
+    private let functionsService: CloudFunctionsService
 
     init(
         firestoreService: FirestoreService = FirestoreService(),
-        storageService: StorageService = StorageService()
+        storageService: StorageService = StorageService(),
+        functionsService: CloudFunctionsService = CloudFunctionsService()
     ) {
         self.firestoreService = firestoreService
         self.storageService = storageService
+        self.functionsService = functionsService
     }
 
     func load(from user: AppUser) {
-        displayName = user.displayName
-        bio = user.bio
-        chefLevel = user.chefLevel
+        fullName = user.fullName
+        bio = user.bio ?? ""
+        chefLevel = ChefLevel(rawValue: user.chefLevel ?? "") ?? .beginner
         photoURL = user.photoURL
+        hasAcceptedHaccp = user.hasAcceptedHaccp
+        if let haccpVersion = user.haccpVersion, !haccpVersion.isEmpty {
+            self.haccpVersion = haccpVersion
+        }
     }
 
     func uploadPhoto(userId: String, data: Data) async {
@@ -60,7 +70,7 @@ final class ProfileViewModel: ObservableObject {
     }
 
     func save(userId: String) async {
-        let cleanedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedBio = bio.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !cleanedName.isEmpty else {
@@ -74,15 +84,34 @@ final class ProfileViewModel: ObservableObject {
         do {
             try await firestoreService.updateUserProfile(
                 uid: userId,
-                displayName: cleanedName,
-                bio: cleanedBio,
-                chefLevel: chefLevel,
+                fullName: cleanedName,
+                bio: cleanedBio.isEmpty ? nil : cleanedBio,
+                chefLevel: chefLevel.rawValue,
                 photoURL: photoURL
             )
             successMessage = "Profil enregistre."
         } catch {
             #if DEBUG
             logNSErrorDetails(error, context: "saveProfile")
+            #endif
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func acknowledgeHaccp() async {
+        isAcknowledgingHaccp = true
+        defer { isAcknowledgingHaccp = false }
+
+        do {
+            try await functionsService.acknowledgeHaccp(version: haccpVersion)
+            hasAcceptedHaccp = true
+            successMessage = "Regles HACCP valides."
+            #if DEBUG
+            debugLog("[Profile][acknowledgeHaccp] success version=\(haccpVersion)")
+            #endif
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "acknowledgeHaccp")
             #endif
             errorMessage = error.localizedDescription
         }

@@ -8,11 +8,16 @@ final class SessionViewModel: ObservableObject {
     @Published var isBootstrapping = true
     @Published var globalErrorMessage: String?
 
-    private let firestoreService = FirestoreService()
-    private let authService = AuthService()
+    private let firestoreService: FirestoreService
+    private let authService: AuthService
     private var authListenerHandle: AuthStateDidChangeListenerHandle?
 
-    init() {
+    init(
+        firestoreService: FirestoreService = FirestoreService(),
+        authService: AuthService = AuthService()
+    ) {
+        self.firestoreService = firestoreService
+        self.authService = authService
         startAuthListener()
     }
 

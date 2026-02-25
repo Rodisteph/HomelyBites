@@ -24,6 +24,21 @@ const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const ONBOARDING_RETURN_URL = 'homelybites://onboarding/return';
 const ONBOARDING_REFRESH_URL = 'homelybites://onboarding/refresh';
 const PAYMENT_INTENT_ORDERS_COLLECTION = 'payment_intent_orders';
+const HACCP_VERSION_CURRENT = '2026-02';
+const SERVICE_MODE = Object.freeze({
+  ON_SITE: 'on_site',
+  TAKEAWAY: 'takeaway',
+  BOTH: 'both',
+});
+const ALLOWED_MEAL_SERVICE_MODES = new Set([
+  SERVICE_MODE.ON_SITE,
+  SERVICE_MODE.TAKEAWAY,
+  SERVICE_MODE.BOTH,
+]);
+const ALLOWED_ORDER_SERVICE_MODES = new Set([
+  SERVICE_MODE.ON_SITE,
+  SERVICE_MODE.TAKEAWAY,
+]);
 const ORDER_STATUS = Object.freeze({
   PENDING: 'pending',
   CONFIRMED: 'confirmed',
@@ -53,6 +68,16 @@ assertAuthenticated(request) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
   return request.auth.uid;
+}
+
+function
+resolveRequestUid(request) {
+  const authUid = assertAuthenticated(request);
+  const requestedUid = getStringField(request.data ?.uid);
+  if (requestedUid && requestedUid !== authUid) {
+    throw new HttpsError('permission-denied', 'Cannot act on another user.');
+  }
+  return requestedUid || authUid;
 }
 
 async function
@@ -102,14 +127,42 @@ computeStripeStatusFromAccount(account) {
   return 'not_ready';
 }
 
+function
+toConnectStatus(account) {
+  const baseStatus = computeStripeStatusFromAccount(account);
+  if (baseStatus === 'ready') {
+    return 'enabled';
+  }
+  return baseStatus;
+}
+
+function
+getStripeRequestId(error) {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  return error.requestId || error.request_id || error ?.raw ?.requestId || null;
+}
+
+async function
+createStripeOnboardingLink(stripe, stripeAccountId) {
+  return stripe.accountLinks.create({
+    account: stripeAccountId,
+    refresh_url: ONBOARDING_REFRESH_URL,
+    return_url: ONBOARDING_RETURN_URL,
+    type: 'account_onboarding',
+  });
+}
+
 exports.createConnectAccount = onCall(
     {
       region: REGION,
       secrets: [STRIPE_SECRET_KEY],
     },
     async (request) => {
-      const uid = assertAuthenticated(request);
+      const uid = resolveRequestUid(request);
       logger.info('createConnectAccount called', {
+        functionName: 'createConnectAccount',
         uid,
       });
       let step = 'load_profile';
@@ -119,61 +172,92 @@ exports.createConnectAccount = onCall(
         } = await getUserProfile(uid);
         step = 'assert_host_role';
         assertHost(userData);
+        const stripe = getStripeClient();
 
         const existingAccountId = getStringField(userData.stripeAccountId);
         if (existingAccountId) {
-          const existingStatus = getStringField(userData.stripeStatus) ||
-            (userData.stripeOnboarded === true ? 'ready' : 'not_ready');
+          step = 'retrieve_existing_account';
+          const existingAccount = await stripe.accounts.retrieve(existingAccountId);
+          const connectStatus = toConnectStatus(existingAccount);
+          const existingStatus = connectStatus === 'enabled' ? 'ready' : connectStatus;
+          const stripeOnboarded = connectStatus === 'enabled';
+          let onboardingLink = null;
 
+          if (!stripeOnboarded) {
+            step = 'create_existing_onboarding_link';
+            onboardingLink = await createStripeOnboardingLink(stripe, existingAccountId);
+          }
+
+          step = 'save_existing_profile';
           await userRef.set({
             stripeStatus: existingStatus,
+            stripeOnboarded,
+            stripeConnectStatus: connectStatus,
+            stripeOnboardingUrl: onboardingLink ?.url || null,
+            stripeOnboardingExpiresAt: onboardingLink ?.expires_at || null,
             stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           }, {
             merge: true,
           });
 
           logger.info('createConnectAccount returning existing account', {
+            functionName: 'createConnectAccount',
             uid,
             accountId: existingAccountId,
             stripeStatus: existingStatus,
+            status: connectStatus,
+            onboardingUrl: onboardingLink ?.url || null,
           });
           return {
             accountId: existingAccountId,
-            stripeOnboarded: userData.stripeOnboarded === true,
+            onboardingUrl: onboardingLink ?.url || null,
+            onboardingExpiresAt: onboardingLink ?.expires_at || null,
+            stripeOnboarded,
             stripeStatus: existingStatus,
+            status: connectStatus,
             alreadyExists: true,
           };
         }
 
         step = 'create_stripe_account';
-        const stripe = getStripeClient();
         const account = await stripe.accounts.create({
           type: 'express',
-          email: request.auth.token.email || undefined,
+          email: request.auth ?.token ?.email || undefined,
           metadata: {
             uid,
           },
         });
+
+        step = 'create_onboarding_link';
+        const onboardingLink = await createStripeOnboardingLink(stripe, account.id);
 
         step = 'save_user_profile';
         await userRef.set({
           stripeAccountId: account.id,
           stripeOnboarded: false,
           stripeStatus: 'not_ready',
+          stripeConnectStatus: 'not_ready',
+          stripeOnboardingUrl: onboardingLink.url,
+          stripeOnboardingExpiresAt: onboardingLink.expires_at,
           stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {
           merge: true,
         });
 
         logger.info('createConnectAccount success', {
+          functionName: 'createConnectAccount',
           uid,
           accountId: account.id,
           stripeStatus: 'not_ready',
+          onboardingUrl: onboardingLink.url,
         });
         return {
           accountId: account.id,
+          onboardingUrl: onboardingLink.url,
+          onboardingExpiresAt: onboardingLink.expires_at,
           stripeOnboarded: false,
           stripeStatus: 'not_ready',
+          status: 'not_ready',
           alreadyExists: false,
         };
       } catch (error) {
@@ -181,9 +265,23 @@ exports.createConnectAccount = onCall(
           throw error;
         }
 
+        if (error && error.type === 'StripeAuthenticationError') {
+          logger.error('createConnectAccount failed: invalid Stripe credentials', {
+            functionName: 'createConnectAccount',
+            uid,
+            step,
+            stripeRequestId: getStripeRequestId(error),
+            stripeType: error.type,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw new HttpsError('failed-precondition', 'Stripe credentials are invalid on backend.');
+        }
+
         logger.error('createConnectAccount failed', {
+          functionName: 'createConnectAccount',
           uid,
           step,
+          stripeRequestId: getStripeRequestId(error),
           stripeType: error && error.type ? error.type : null,
           stripeCode: error && error.code ? error.code : null,
           stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
@@ -200,8 +298,9 @@ exports.createOnboardingLink = onCall(
       secrets: [STRIPE_SECRET_KEY],
     },
     async (request) => {
-      const uid = assertAuthenticated(request);
+      const uid = resolveRequestUid(request);
       logger.info('createOnboardingLink called', {
+        functionName: 'createOnboardingLink',
         uid,
       });
       let step = 'load_profile';
@@ -222,12 +321,7 @@ exports.createOnboardingLink = onCall(
 
         step = 'create_onboarding_link';
         const stripe = getStripeClient();
-        const link = await stripe.accountLinks.create({
-          account: stripeAccountId,
-          refresh_url: ONBOARDING_REFRESH_URL,
-          return_url: ONBOARDING_RETURN_URL,
-          type: 'account_onboarding',
-        });
+        const link = await createStripeOnboardingLink(stripe, stripeAccountId);
 
         step = 'save_onboarding_state';
         await userRef.set({
@@ -240,6 +334,7 @@ exports.createOnboardingLink = onCall(
         });
 
         logger.info('createOnboardingLink success', {
+          functionName: 'createOnboardingLink',
           uid,
           stripeAccountId,
           expiresAt: link.expires_at,
@@ -247,6 +342,7 @@ exports.createOnboardingLink = onCall(
         return {
           url: link.url,
           expiresAt: link.expires_at,
+          status: 'pending',
         };
       } catch (error) {
         if (error instanceof HttpsError) {
@@ -254,8 +350,10 @@ exports.createOnboardingLink = onCall(
         }
 
         logger.error('createOnboardingLink failed', {
+          functionName: 'createOnboardingLink',
           uid,
           step,
+          stripeRequestId: getStripeRequestId(error),
           stripeType: error && error.type ? error.type : null,
           stripeCode: error && error.code ? error.code : null,
           stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
@@ -272,8 +370,9 @@ exports.refreshStripeStatus = onCall(
       secrets: [STRIPE_SECRET_KEY],
     },
     async (request) => {
-      const uid = assertAuthenticated(request);
+      const uid = resolveRequestUid(request);
       logger.info('refreshStripeStatus called', {
+        functionName: 'refreshStripeStatus',
         uid,
       });
 
@@ -308,6 +407,7 @@ exports.refreshStripeStatus = onCall(
         });
 
         logger.info('refreshStripeStatus success', {
+          functionName: 'refreshStripeStatus',
           uid,
           stripeAccountId,
           stripeStatus,
@@ -327,13 +427,161 @@ exports.refreshStripeStatus = onCall(
         }
 
         logger.error('refreshStripeStatus failed', {
+          functionName: 'refreshStripeStatus',
           uid,
           step,
+          stripeRequestId: getStripeRequestId(error),
           stripeType: error && error.type ? error.type : null,
           stripeCode: error && error.code ? error.code : null,
           error: error instanceof Error ? error.message : String(error),
         });
         throw new HttpsError('internal', 'Unable to refresh Stripe status.');
+      }
+    },
+);
+
+exports.getConnectStatus = onCall(
+    {
+      region: REGION,
+      secrets: [STRIPE_SECRET_KEY],
+    },
+    async (request) => {
+      const uid = resolveRequestUid(request);
+      logger.info('getConnectStatus called', {
+        functionName: 'getConnectStatus',
+        uid,
+      });
+
+      let step = 'load_profile';
+      try {
+        const {
+          userRef, userData,
+        } = await getUserProfile(uid);
+        step = 'assert_host_role';
+        assertHost(userData);
+
+        const stripeAccountId = getStringField(userData.stripeAccountId);
+        if (!stripeAccountId) {
+          throw new HttpsError('failed-precondition', 'Host has no Stripe account yet.');
+        }
+
+        step = 'retrieve_stripe_account';
+        const stripe = getStripeClient();
+        const account = await stripe.accounts.retrieve(stripeAccountId);
+
+        const status = toConnectStatus(account);
+        const payoutsEnabled = Boolean(account ?.payouts_enabled);
+        const chargesEnabled = Boolean(account ?.charges_enabled);
+        const requirements = {
+          currentlyDue: Array.isArray(account ?.requirements ?.currently_due) ?
+            account.requirements.currently_due : [],
+          eventuallyDue: Array.isArray(account ?.requirements ?.eventually_due) ?
+            account.requirements.eventually_due : [],
+          pastDue: Array.isArray(account ?.requirements ?.past_due) ?
+            account.requirements.past_due : [],
+          pendingVerification: Array.isArray(account ?.requirements ?.pending_verification) ?
+            account.requirements.pending_verification : [],
+        };
+
+        step = 'save_profile_status';
+        await userRef.set({
+          stripeOnboarded: status === 'enabled',
+          stripeStatus: status === 'enabled' ? 'ready' : status,
+          stripeConnectStatus: status,
+          stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+
+        logger.info('getConnectStatus success', {
+          functionName: 'getConnectStatus',
+          uid,
+          stripeAccountId,
+          status,
+          payoutsEnabled,
+          chargesEnabled,
+          currentlyDueCount: requirements.currentlyDue.length,
+        });
+
+        return {
+          accountId: stripeAccountId,
+          status,
+          payoutsEnabled,
+          chargesEnabled,
+          requirements,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        logger.error('getConnectStatus failed', {
+          functionName: 'getConnectStatus',
+          uid,
+          step,
+          stripeRequestId: getStripeRequestId(error),
+          stripeType: error && error.type ? error.type : null,
+          stripeCode: error && error.code ? error.code : null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError('internal', 'Unable to fetch Stripe Connect status.');
+      }
+    },
+);
+
+exports.acknowledgeHaccp = onCall(
+    {
+      region: REGION,
+    },
+    async (request) => {
+      const uid = resolveRequestUid(request);
+      logger.info('acknowledgeHaccp called', {
+        functionName: 'acknowledgeHaccp',
+        uid,
+      });
+
+      let step = 'load_profile';
+      try {
+        const {
+          userRef, userData,
+        } = await getUserProfile(uid);
+
+        step = 'assert_host_role';
+        assertHost(userData);
+
+        const requestedVersion = getStringField(request.data ?.version);
+        const version = requestedVersion || HACCP_VERSION_CURRENT;
+
+        step = 'save_haccp_ack';
+        await userRef.set({
+          haccpAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+          haccpVersion: version,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+
+        logger.info('acknowledgeHaccp success', {
+          functionName: 'acknowledgeHaccp',
+          uid,
+          haccpVersion: version,
+        });
+        return {
+          ok: true,
+          haccpVersion: version,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        logger.error('acknowledgeHaccp failed', {
+          functionName: 'acknowledgeHaccp',
+          uid,
+          step,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError('internal', 'Unable to save HACCP acknowledgement.');
       }
     },
 );
@@ -348,10 +596,16 @@ exports.createOrderAndPaymentIntent = onCall(
       const mealId = request.data ?.mealId;
       const portions = request.data ?.portions;
       const rawNote = request.data ?.note;
+      const requestedServiceMode = getServiceModeField(
+          request.data ?.serviceMode,
+          ALLOWED_ORDER_SERVICE_MODES,
+          'serviceMode',
+      ) || SERVICE_MODE.ON_SITE;
       logger.info('createOrderAndPaymentIntent called', {
         uid,
         mealId: typeof mealId === 'string' ? mealId : null,
         portions: Number.isInteger(portions) ? portions : null,
+        serviceMode: requestedServiceMode,
       });
 
       if (!mealId || typeof mealId !== 'string') {
@@ -386,11 +640,30 @@ exports.createOrderAndPaymentIntent = onCall(
       const meal = mealSnapshot.data();
       const priceCents = meal ?.priceCents;
       const hostId = meal ?.hostId;
+      const rawMealServiceMode = getStringField(meal ?.serviceMode);
+      let mealServiceMode = SERVICE_MODE.ON_SITE;
+      if (rawMealServiceMode) {
+        if (ALLOWED_MEAL_SERVICE_MODES.has(rawMealServiceMode)) {
+          mealServiceMode = rawMealServiceMode;
+        } else {
+          logger.warn('Meal has invalid serviceMode, defaulting to on_site', {
+            mealId,
+            hostId: typeof hostId === 'string' ? hostId : null,
+            rawMealServiceMode,
+          });
+        }
+      }
       if (!Number.isInteger(priceCents) || priceCents <= 0) {
         throw new HttpsError('failed-precondition', 'Meal has an invalid price.');
       }
       if (!hostId || typeof hostId !== 'string') {
         throw new HttpsError('failed-precondition', 'Meal host is missing.');
+      }
+      if (mealServiceMode !== SERVICE_MODE.BOTH && mealServiceMode !== requestedServiceMode) {
+        throw new HttpsError(
+            'failed-precondition',
+            'Selected service mode is not available for this meal.',
+        );
       }
 
       const {
@@ -432,6 +705,7 @@ exports.createOrderAndPaymentIntent = onCall(
             mealId,
             clientId: uid,
             hostId,
+            serviceMode: requestedServiceMode,
           },
         }, {
           idempotencyKey: `create_order_${orderId}`,
@@ -478,6 +752,8 @@ exports.createOrderAndPaymentIntent = onCall(
             amount,
             amountCents: amount,
             currency: 'eur',
+            serviceMode: requestedServiceMode,
+            mealServiceMode,
             paymentIntentId: paymentIntent.id,
             status: ORDER_STATUS.PENDING,
             paymentStatus: PAYMENT_STATUS.REQUIRES_PAYMENT,
@@ -621,8 +897,357 @@ exports.transitionOrderStatus = onCall(
 );
 
 function
+collectStringValues(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+      .filter((item) => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+}
+
+function
+extractStoragePath(candidate) {
+  if (typeof candidate !== 'string') {
+    return null;
+  }
+
+  const raw = candidate.trim();
+  if (!raw) {
+    return null;
+  }
+
+  if (raw.startsWith('gs://')) {
+    const noScheme = raw.slice('gs://'.length);
+    const firstSlash = noScheme.indexOf('/');
+    if (firstSlash === -1) {
+      return null;
+    }
+    return noScheme.slice(firstSlash + 1);
+  }
+
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const parsed = new URL(raw);
+      const marker = '/o/';
+      const markerIndex = parsed.pathname.indexOf(marker);
+      if (markerIndex === -1) {
+        return null;
+      }
+      const encodedPath = parsed.pathname.slice(markerIndex + marker.length);
+      return decodeURIComponent(encodedPath);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  return raw.replace(/^\/+/, '');
+}
+
+function
+collectMealImagePaths(meal) {
+  const candidates = [
+    ...collectStringValues(meal ?.imagePath),
+    ...collectStringValues(meal ?.imagePaths),
+    ...collectStringValues(meal ?.storagePath),
+    ...collectStringValues(meal ?.storagePaths),
+    ...collectStringValues(meal ?.photoPath),
+    ...collectStringValues(meal ?.photoPaths),
+    ...collectStringValues(meal ?.imageURL),
+    ...collectStringValues(meal ?.imageUrls),
+    ...collectStringValues(meal ?.imageURLs),
+  ];
+
+  const normalized = candidates
+      .map((path) => extractStoragePath(path))
+      .filter((path) => typeof path === 'string' && path.length > 0);
+
+  return [...new Set(normalized)];
+}
+
+async function
+deleteMealStoragePaths(mealId, uid, storagePaths) {
+  if (!storagePaths.length) {
+    logger.info('deleteMeal storage skipped', {
+      functionName: 'deleteMeal',
+      uid,
+      mealId,
+      step: 'deletedStorage',
+      deletedCount: 0,
+      failedCount: 0,
+    });
+    return {
+      deletedCount: 0,
+      failedCount: 0,
+    };
+  }
+
+  const bucket = admin.storage().bucket();
+  let deletedCount = 0;
+  let failedCount = 0;
+
+  for (const storagePath of storagePaths) {
+    try {
+      await bucket.file(storagePath).delete({
+        ignoreNotFound: true,
+      });
+      deletedCount += 1;
+    } catch (error) {
+      failedCount += 1;
+      logger.warn('deleteMeal failed to delete storage object', {
+        functionName: 'deleteMeal',
+        uid,
+        mealId,
+        storagePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  logger.info('deleteMeal storage completed', {
+    functionName: 'deleteMeal',
+    uid,
+    mealId,
+    step: 'deletedStorage',
+    deletedCount,
+    failedCount,
+  });
+
+  return {
+    deletedCount,
+    failedCount,
+  };
+}
+
+exports.deleteMeal = onCall(
+    {
+      region: REGION,
+    },
+    async (request) => {
+      const uid = assertAuthenticated(request);
+      const mealId = getStringField(request.data ?.mealId);
+
+      logger.info('deleteMeal called', {
+        functionName: 'deleteMeal',
+        uid,
+        mealId: mealId || null,
+        step: 'requested',
+      });
+
+      if (!mealId) {
+        throw new HttpsError('invalid-argument', 'mealId is required.');
+      }
+
+      let step = 'load_meal';
+      try {
+        let mealRef = db.collection('meals').doc(mealId);
+        let snapshot = await mealRef.get();
+
+        if (!snapshot.exists) {
+          step = 'fallback_lookup_legacy_id';
+          logger.warn('deleteMeal direct lookup missed, trying fallback by field id', {
+            functionName: 'deleteMeal',
+            uid,
+            mealId,
+          });
+
+          const legacySnapshot = await db.collection('meals')
+              .where('id', '==', mealId)
+              .limit(1)
+              .get();
+
+          if (!legacySnapshot.empty) {
+            const matchedDoc = legacySnapshot.docs[0];
+            mealRef = matchedDoc.ref;
+            snapshot = matchedDoc;
+            logger.info('deleteMeal fallback matched meal document', {
+              functionName: 'deleteMeal',
+              uid,
+              mealId,
+              matchedDocumentId: matchedDoc.id,
+            });
+          }
+        }
+
+        if (!snapshot.exists) {
+          throw new HttpsError('not-found', 'Meal not found.');
+        }
+
+        const meal = snapshot.data() || {};
+        const ownerId = getStringField(meal.hostId) ||
+          getStringField(meal.ownerId) ||
+          getStringField(meal.userId);
+
+        if (!ownerId) {
+          throw new HttpsError('failed-precondition', 'Meal owner is missing.');
+        }
+
+        if (ownerId !== uid) {
+          throw new HttpsError('permission-denied', 'You can only delete your own meals.');
+        }
+
+        logger.info('deleteMeal authorized', {
+          functionName: 'deleteMeal',
+          uid,
+          mealId,
+          ownerId,
+          documentId: mealRef.id,
+          step: 'authorized',
+        });
+
+        const storagePaths = collectMealImagePaths(meal);
+
+        step = 'delete_firestore';
+        await mealRef.delete();
+        logger.info('deleteMeal firestore deleted', {
+          functionName: 'deleteMeal',
+          uid,
+          mealId,
+          documentId: mealRef.id,
+          step: 'deletedFirestore',
+        });
+
+        step = 'delete_storage';
+        const {
+          deletedCount,
+          failedCount,
+        } = await deleteMealStoragePaths(mealId, uid, storagePaths);
+
+        logger.info('deleteMeal done', {
+          functionName: 'deleteMeal',
+          uid,
+          mealId,
+          documentId: mealRef.id,
+          step: 'done',
+          deletedStorageCount: deletedCount,
+          failedStorageDeletes: failedCount,
+        });
+
+        return {
+          ok: true,
+          documentId: mealRef.id,
+          deletedStorageCount: deletedCount,
+          failedStorageDeletes: failedCount,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        logger.error('deleteMeal failed', {
+          functionName: 'deleteMeal',
+          uid,
+          mealId,
+          step,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError('internal', 'Unable to delete meal.');
+      }
+    },
+);
+
+exports.backfillMealLocations = onCall(
+    {
+      region: REGION,
+    },
+    async (request) => {
+      const uid = assertAuthenticated(request);
+      const isAdmin = request.auth ?.token ?.admin === true;
+      const requestedOnlyMine = request.data ?.onlyMine !== false;
+      if (!requestedOnlyMine && !isAdmin) {
+        throw new HttpsError('permission-denied', 'Only admins can backfill all meals.');
+      }
+      const onlyMine = requestedOnlyMine || !isAdmin;
+      const dryRun = request.data ?.dryRun === true;
+      const fallbackLocation = new admin.firestore.GeoPoint(52.3676, 4.9041);
+      const fallbackCity = 'Amsterdam';
+
+      logger.info('backfillMealLocations called', {
+        functionName: 'backfillMealLocations',
+        uid,
+        onlyMine,
+        dryRun,
+      });
+
+      let query = db.collection('meals');
+      if (onlyMine) {
+        query = query.where('hostId', '==', uid);
+      }
+
+      const mealsSnapshot = await query.limit(500).get();
+      let processedCount = 0;
+      let updatedCount = 0;
+
+      const batch = db.batch();
+      mealsSnapshot.docs.forEach((doc) => {
+        processedCount += 1;
+        const meal = doc.data() || {};
+        const hasLocation = Boolean(meal.location) || Boolean(meal.geoPoint);
+
+        if (hasLocation) {
+          return;
+        }
+
+        updatedCount += 1;
+        if (!dryRun) {
+          batch.set(doc.ref, {
+            location: fallbackLocation,
+            locationName: getStringField(meal.locationName) ||
+              getStringField(meal.city) ||
+              fallbackCity,
+            city: getStringField(meal.city) || fallbackCity,
+            locationBackfilledAt: admin.firestore.FieldValue.serverTimestamp(),
+            locationBackfilledBy: uid,
+          }, {
+            merge: true,
+          });
+        }
+      });
+
+      if (!dryRun && updatedCount > 0) {
+        await batch.commit();
+      }
+
+      logger.info('backfillMealLocations completed', {
+        functionName: 'backfillMealLocations',
+        uid,
+        onlyMine,
+        dryRun,
+        processedCount,
+        updatedCount,
+      });
+
+      return {
+        ok: true,
+        processedCount,
+        updatedCount,
+        dryRun,
+      };
+    },
+);
+
+function
 getStringField(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function
+getServiceModeField(value, allowedModes, fieldName) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const mode = getStringField(value);
+  if (!mode || !allowedModes.has(mode)) {
+    throw new HttpsError('invalid-argument', `${fieldName} is invalid.`);
+  }
+  return mode;
 }
 
 function

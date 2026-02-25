@@ -10,7 +10,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Nom")
                         Spacer()
-                        Text(user.displayName)
+                        Text(user.fullName)
                             .foregroundStyle(.secondary)
                     }
 
@@ -25,7 +25,7 @@ struct SettingsView: View {
                         HStack {
                             Text("Niveau")
                             Spacer()
-                            Text(user.chefLevel.displayTitle)
+                            Text(ChefLevel(rawValue: user.chefLevel ?? "")?.displayTitle ?? "Non defini")
                                 .foregroundStyle(.secondary)
                         }
 

@@ -7,10 +7,26 @@ struct OrderCheckoutSession {
     let clientSecret: String
 }
 
+struct ConnectAccountSession {
+    let accountId: String
+    let onboardingURL: URL?
+    let status: String
+    let alreadyExists: Bool
+}
+
 struct StripeAccountStatus {
     let accountId: String
     let stripeOnboarded: Bool
     let stripeStatus: String
+    let payoutsEnabled: Bool?
+    let chargesEnabled: Bool?
+    let requirements: [String: [String]]?
+}
+
+struct MealLocationBackfillResult {
+    let processedCount: Int
+    let updatedCount: Int
+    let dryRun: Bool
 }
 
 final class CloudFunctionsService {
@@ -50,13 +66,30 @@ final class CloudFunctionsService {
         }
     }
 
-    func createConnectAccount() async throws -> String {
+    func createConnectAccount() async throws -> ConnectAccountSession {
         let response = try await call("createConnectAccount", data: [:])
         guard let payload = response as? [String: Any],
               let accountId = payload["accountId"] as? String else {
             throw AppError.invalidResponse
         }
-        return accountId
+
+        let onboardingURL: URL?
+        if let onboardingURLString = payload["onboardingUrl"] as? String,
+           let parsedURL = URL(string: onboardingURLString) {
+            onboardingURL = parsedURL
+        } else {
+            onboardingURL = nil
+        }
+
+        let status = (payload["status"] as? String) ?? "not_ready"
+        let alreadyExists = (payload["alreadyExists"] as? Bool) ?? false
+
+        return ConnectAccountSession(
+            accountId: accountId,
+            onboardingURL: onboardingURL,
+            status: status,
+            alreadyExists: alreadyExists
+        )
     }
 
     func createOnboardingLink() async throws -> URL {
@@ -80,14 +113,87 @@ final class CloudFunctionsService {
         return StripeAccountStatus(
             accountId: accountId,
             stripeOnboarded: stripeOnboarded,
-            stripeStatus: stripeStatus
+            stripeStatus: stripeStatus,
+            payoutsEnabled: payload["payoutsEnabled"] as? Bool,
+            chargesEnabled: payload["chargesEnabled"] as? Bool,
+            requirements: payload["requirements"] as? [String: [String]]
+        )
+    }
+
+    func getConnectStatus() async throws -> StripeAccountStatus {
+        let response = try await call("getConnectStatus", data: [:])
+        guard let payload = response as? [String: Any],
+              let accountId = payload["accountId"] as? String else {
+            throw AppError.invalidResponse
+        }
+
+        let rawStatus = (payload["status"] as? String) ?? "not_ready"
+        let stripeStatus = rawStatus == "enabled" ? "ready" : rawStatus
+        let stripeOnboarded = rawStatus == "enabled"
+
+        return StripeAccountStatus(
+            accountId: accountId,
+            stripeOnboarded: stripeOnboarded,
+            stripeStatus: stripeStatus,
+            payoutsEnabled: payload["payoutsEnabled"] as? Bool,
+            chargesEnabled: payload["chargesEnabled"] as? Bool,
+            requirements: payload["requirements"] as? [String: [String]]
+        )
+    }
+
+    func deleteMeal(mealId: String) async throws {
+        let trimmedMealId = mealId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedMealId.isEmpty else {
+            throw AppError.invalidInput("mealId manquant pour supprimer le repas.")
+        }
+
+        let response = try await call("deleteMeal", data: [
+            "mealId": trimmedMealId
+        ])
+
+        guard let payload = response as? [String: Any],
+              let ok = payload["ok"] as? Bool,
+              ok == true else {
+            throw AppError.invalidResponse
+        }
+    }
+
+    func acknowledgeHaccp(version: String = "2026-02") async throws {
+        let response = try await call("acknowledgeHaccp", data: [
+            "version": version
+        ])
+
+        guard let payload = response as? [String: Any],
+              let ok = payload["ok"] as? Bool,
+              ok == true else {
+            throw AppError.invalidResponse
+        }
+    }
+
+    func backfillMealLocations(onlyMine: Bool = true, dryRun: Bool = false) async throws -> MealLocationBackfillResult {
+        let response = try await call("backfillMealLocations", data: [
+            "onlyMine": onlyMine,
+            "dryRun": dryRun
+        ])
+
+        guard let payload = response as? [String: Any],
+              let ok = payload["ok"] as? Bool,
+              ok == true else {
+            throw AppError.invalidResponse
+        }
+
+        return MealLocationBackfillResult(
+            processedCount: payload["processedCount"] as? Int ?? 0,
+            updatedCount: payload["updatedCount"] as? Int ?? 0,
+            dryRun: payload["dryRun"] as? Bool ?? dryRun
         )
     }
 
     func createOrderAndPaymentIntent(
         mealId: String,
         portions: Int,
-        note: String
+        note: String,
+        serviceMode: MealServiceMode? = nil
     ) async throws -> OrderCheckoutSession {
         guard !mealId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AppError.invalidInput("mealId manquant pour creer le paiement.")
@@ -96,15 +202,20 @@ final class CloudFunctionsService {
             throw AppError.invalidInput("Le nombre de portions doit etre superieur a 0.")
         }
 
-        #if DEBUG
-        debugLog("[Functions][createOrderAndPaymentIntent] start mealId=\(mealId) portions=\(portions)")
-        #endif
-
-        let response = try await call("createOrderAndPaymentIntent", data: [
+        var payload: [String: Any] = [
             "mealId": mealId,
             "portions": portions,
             "note": note
-        ])
+        ]
+        if let serviceMode {
+            payload["serviceMode"] = serviceMode.rawValue
+        }
+
+        #if DEBUG
+        debugLog("[Functions][createOrderAndPaymentIntent] start mealId=\(mealId) portions=\(portions) serviceMode=\(serviceMode?.rawValue ?? "nil")")
+        #endif
+
+        let response = try await call("createOrderAndPaymentIntent", data: payload)
 
         guard let payload = response as? [String: Any],
               let orderId = payload["orderId"] as? String,
@@ -129,6 +240,40 @@ final class CloudFunctionsService {
             "orderId": orderId,
             "nextStatus": status.rawValue
         ])
+    }
+
+    func confirmPaymentWithApplePay(
+        orderId: String,
+        applePayToken: String
+    ) async throws {
+        guard !orderId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AppError.invalidInput("orderId manquant pour confirmer le paiement Apple Pay.")
+        }
+        guard !applePayToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AppError.invalidInput("Token Apple Pay manquant.")
+        }
+
+        #if DEBUG
+        debugLog("[Functions][confirmPaymentWithApplePay] start orderId=\(orderId)")
+        #endif
+
+        let response = try await call("confirmApplePayPayment", data: [
+            "orderId": orderId,
+            "applePayToken": applePayToken
+        ])
+
+        guard let payload = response as? [String: Any],
+              let ok = payload["ok"] as? Bool,
+              ok == true else {
+            #if DEBUG
+            debugLog("[Functions][confirmPaymentWithApplePay] invalid payload=\(String(describing: response))")
+            #endif
+            throw AppError.invalidResponse
+        }
+
+        #if DEBUG
+        debugLog("[Functions][confirmPaymentWithApplePay] success orderId=\(orderId)")
+        #endif
     }
 
     private func redactedPayload(_ payload: [String: Any]) -> String {
@@ -248,6 +393,24 @@ final class CloudFunctionsService {
             return "Compte Stripe introuvable ou onboarding non initialise. Active d'abord les paiements."
         case ("refreshStripeStatus", .failedPrecondition):
             return "Aucun compte Stripe associe a ce host."
+        case ("getConnectStatus", .failedPrecondition):
+            return "Aucun compte Stripe associe a ce host."
+        case ("deleteMeal", .permissionDenied):
+            return "Suppression refusee: ce repas ne t'appartient pas."
+        case ("deleteMeal", .notFound):
+            return "Ce repas n'existe plus."
+        case ("deleteMeal", .internal):
+            return "Erreur serveur pendant la suppression du repas. Verifie les logs Functions deleteMeal."
+        case ("acknowledgeHaccp", .permissionDenied):
+            return "Compte host requis pour valider HACCP."
+        case ("acknowledgeHaccp", .internal):
+            return "Erreur serveur pendant la validation HACCP."
+        case ("backfillMealLocations", .permissionDenied):
+            return "Backfill global reserve a un compte admin."
+        case ("backfillMealLocations", .internal):
+            return "Erreur serveur pendant le backfill location."
+        case ("createOrderAndPaymentIntent", .failedPrecondition):
+            return "Ce mode de service n'est pas disponible pour ce repas."
         case (_, .unauthenticated):
             return AppError.missingAuth.localizedDescription
         case (_, .permissionDenied):

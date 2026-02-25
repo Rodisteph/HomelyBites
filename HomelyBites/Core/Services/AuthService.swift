@@ -112,7 +112,11 @@ final class AuthService {
         debugLog("[AuthService][signUp] firestore.write start collection=\(usersCollection) uid=\(result.user.uid)")
         #endif
         do {
-            try await db.collection(usersCollection).document(result.user.uid).setData(user.toFirestore())
+            let userRef = db.collection(usersCollection).document(result.user.uid)
+            try await userRef.setData(from: user)
+            let snapshot = try await userRef.getDocumentAsync()
+            let savedUser = try snapshot.data(as: AppUser.self)
+            _ = savedUser
             #if DEBUG
             debugLog("[AuthService][signUp] firestore.write success uid=\(result.user.uid)")
             #endif
@@ -130,6 +134,15 @@ final class AuthService {
 
     func signOut() throws {
         try auth.signOut()
+    }
+
+    func fetchUserProfile(uid: String) async throws -> AppUser {
+        let snapshot = try await db.collection(usersCollection).document(uid).getDocumentAsync()
+        var user = try snapshot.data(as: AppUser.self)
+        if user.id.isEmpty {
+            user.id = snapshot.documentID
+        }
+        return user
     }
 
     private func maskedEmail(_ email: String) -> String {

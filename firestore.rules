@@ -15,6 +15,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(uid)).data.role == "host";
     }
 
+    function hostHasHaccp(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.haccpAcceptedAt is timestamp
+        && get(/databases/$(database)/documents/users/$(uid)).data.haccpVersion is string
+        && get(/databases/$(database)/documents/users/$(uid)).data.haccpVersion.size() > 0;
+    }
+
     function isOrderParticipant() {
       return isSignedIn()
         && (
@@ -35,6 +41,14 @@ service cloud.firestore {
         );
     }
 
+    function isValidServiceMode(serviceMode) {
+      return serviceMode == null
+        || (serviceMode is string
+          && (serviceMode == "on_site"
+            || serviceMode == "takeaway"
+            || serviceMode == "both"));
+    }
+
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create, update, delete: if isOwner(uid);
@@ -46,13 +60,16 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.hostId == request.auth.uid
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "host"
+        && hostHasHaccp(request.auth.uid)
         && request.resource.data.priceCents is int
         && request.resource.data.priceCents > 0
         && request.resource.data.availablePortions is int
-        && request.resource.data.availablePortions > 0;
+        && request.resource.data.availablePortions > 0
+        && isValidServiceMode(request.resource.data.serviceMode);
 
       allow update: if isMealOwner()
-        && request.resource.data.hostId == resource.data.hostId;
+        && request.resource.data.hostId == resource.data.hostId
+        && isValidServiceMode(request.resource.data.serviceMode);
 
       allow delete: if isMealOwner();
     }
