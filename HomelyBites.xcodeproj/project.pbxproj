@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		08E8CF8AA33AB7EF6603E4BE /* DMSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4C1826631F59E989B59D6D1A /* DMSans-Regular.ttf */; };
+		0A62A9D23F9D3F8230AD7409 /* CormorantGaramond-MediumItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F24B53C71C5F2A43A99FEBBF /* CormorantGaramond-MediumItalic.ttf */; };
 		0B89EDD12F3F8BFF00E848E4 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD02F3F8BFF00E848E4 /* FirebaseAuth */; };
 		0B89EDD32F3F8BFF00E848E4 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD22F3F8BFF00E848E4 /* FirebaseCore */; };
 		0B89EDD52F3F8BFF00E848E4 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDD42F3F8BFF00E848E4 /* FirebaseFirestore */; };
@@ -15,11 +17,30 @@
 		0B89EDDC2F3F8CC200E848E4 /* StripePayments in Frameworks */ = {isa = PBXBuildFile; productRef = 0B89EDDB2F3F8CC200E848E4 /* StripePayments */; };
 		0BB9EF3D2F46075300FF52F0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */; };
 		0BC7A1012F70A10000B1AA01 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 0BC7A1032F70A10000B1AA01 /* GoogleSignIn */; };
+		0BC7A1042F71B20000B1AA01 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 0BC7A1052F71B20000B1AA01 /* FirebaseStorage */; };
+		15AA1CAD278C0A7CAD4CFB3B /* CormorantGaramond-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DA43CE5004F2DF159D3DA647 /* CormorantGaramond-Italic.ttf */; };
+		2D5463D003F145E2DF341D7C /* DMSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 12AA3ED3A46F5628B907BF00 /* DMSans-Bold.ttf */; };
+		48348A76EA8858977AD84262 /* CormorantGaramond-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A2A4F495BEA410121E768D73 /* CormorantGaramond-SemiBold.ttf */; };
+		8791AD050CDA8E7A18CE28AD /* CormorantGaramond-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 340C2E1AB9D6D3A2010552FB /* CormorantGaramond-Regular.ttf */; };
+		B2E6BBDBDC8C30991CB1B962 /* CormorantGaramond-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7AEDF8C47243FDD5E7FCBE50 /* CormorantGaramond-Medium.ttf */; };
+		C8303C3733B898B28F0486D1 /* DMSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 34BC868A4D5B940331FAA680 /* DMSans-Medium.ttf */; };
+		DF796564B6DF441542C209B3 /* DMSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A73BB5B57A73A4E4CB925082 /* DMSans-SemiBold.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = HomelyBites/Config.xcconfig; sourceTree = "<group>"; };
 		11B1A0012E7F2FFA00428788 /* HomelyBites.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomelyBites.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12AA3ED3A46F5628B907BF00 /* DMSans-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-Bold.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Bold.ttf"; sourceTree = "<group>"; };
+		2B66A614AF94563ED4C81C99 /* HomelyBites.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = HomelyBites.entitlements; path = HomelyBites/HomelyBites.entitlements; sourceTree = "<group>"; };
+		340C2E1AB9D6D3A2010552FB /* CormorantGaramond-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-Regular.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Regular.ttf"; sourceTree = "<group>"; };
+		34BC868A4D5B940331FAA680 /* DMSans-Medium.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-Medium.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Medium.ttf"; sourceTree = "<group>"; };
+		4C1826631F59E989B59D6D1A /* DMSans-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-Regular.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Regular.ttf"; sourceTree = "<group>"; };
+		7AEDF8C47243FDD5E7FCBE50 /* CormorantGaramond-Medium.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-Medium.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Medium.ttf"; sourceTree = "<group>"; };
+		A2A4F495BEA410121E768D73 /* CormorantGaramond-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-SemiBold.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-SemiBold.ttf"; sourceTree = "<group>"; };
+		A73BB5B57A73A4E4CB925082 /* DMSans-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-SemiBold.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-SemiBold.ttf"; sourceTree = "<group>"; };
+		DA43CE5004F2DF159D3DA647 /* CormorantGaramond-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-Italic.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Italic.ttf"; sourceTree = "<group>"; };
+		F24B53C71C5F2A43A99FEBBF /* CormorantGaramond-MediumItalic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-MediumItalic.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-MediumItalic.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -53,6 +74,7 @@
 				0B89EDD12F3F8BFF00E848E4 /* FirebaseAuth in Frameworks */,
 				0B89EDD52F3F8BFF00E848E4 /* FirebaseFirestore in Frameworks */,
 				0B89EDD72F3F8BFF00E848E4 /* FirebaseFunctions in Frameworks */,
+				0BC7A1042F71B20000B1AA01 /* FirebaseStorage in Frameworks */,
 				0BC7A1012F70A10000B1AA01 /* GoogleSignIn in Frameworks */,
 				0B89EDDA2F3F8CC200E848E4 /* StripePaymentSheet in Frameworks */,
 			);
@@ -75,6 +97,17 @@
 				0BA077352F3F85B00029C4B4 /* Frameworks */,
 				11B1A0052E7F2FFA00428788 /* Products */,
 				0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */,
+				0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */,
+				DA43CE5004F2DF159D3DA647 /* CormorantGaramond-Italic.ttf */,
+				7AEDF8C47243FDD5E7FCBE50 /* CormorantGaramond-Medium.ttf */,
+				F24B53C71C5F2A43A99FEBBF /* CormorantGaramond-MediumItalic.ttf */,
+				340C2E1AB9D6D3A2010552FB /* CormorantGaramond-Regular.ttf */,
+				A2A4F495BEA410121E768D73 /* CormorantGaramond-SemiBold.ttf */,
+				12AA3ED3A46F5628B907BF00 /* DMSans-Bold.ttf */,
+				34BC868A4D5B940331FAA680 /* DMSans-Medium.ttf */,
+				4C1826631F59E989B59D6D1A /* DMSans-Regular.ttf */,
+				A73BB5B57A73A4E4CB925082 /* DMSans-SemiBold.ttf */,
+				2B66A614AF94563ED4C81C99 /* HomelyBites.entitlements */,
 			);
 			sourceTree = "<group>";
 		};
@@ -110,6 +143,7 @@
 				0B89EDD22F3F8BFF00E848E4 /* FirebaseCore */,
 				0B89EDD42F3F8BFF00E848E4 /* FirebaseFirestore */,
 				0B89EDD62F3F8BFF00E848E4 /* FirebaseFunctions */,
+				0BC7A1052F71B20000B1AA01 /* FirebaseStorage */,
 				0BC7A1032F70A10000B1AA01 /* GoogleSignIn */,
 				0B89EDD92F3F8CC200E848E4 /* StripePaymentSheet */,
 				0B89EDDB2F3F8CC200E848E4 /* StripePayments */,
@@ -163,6 +197,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				0BB9EF3D2F46075300FF52F0 /* GoogleService-Info.plist in Resources */,
+				15AA1CAD278C0A7CAD4CFB3B /* CormorantGaramond-Italic.ttf in Resources */,
+				B2E6BBDBDC8C30991CB1B962 /* CormorantGaramond-Medium.ttf in Resources */,
+				0A62A9D23F9D3F8230AD7409 /* CormorantGaramond-MediumItalic.ttf in Resources */,
+				8791AD050CDA8E7A18CE28AD /* CormorantGaramond-Regular.ttf in Resources */,
+				48348A76EA8858977AD84262 /* CormorantGaramond-SemiBold.ttf in Resources */,
+				2D5463D003F145E2DF341D7C /* DMSans-Bold.ttf in Resources */,
+				C8303C3733B898B28F0486D1 /* DMSans-Medium.ttf in Resources */,
+				08E8CF8AA33AB7EF6603E4BE /* DMSans-Regular.ttf in Resources */,
+				DF796564B6DF441542C209B3 /* DMSans-SemiBold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -295,13 +338,15 @@
 		};
 		11B1A00E2E7F2FFD00428788 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HomelyBites/HomelyBites.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = HomelyBites/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -317,13 +362,15 @@
 		};
 		11B1A00F2E7F2FFD00428788 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HomelyBites/HomelyBites.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = HomelyBites/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -422,6 +469,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0BC7A1022F70A10000B1AA01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignIn;
+		};
+		0BC7A1052F71B20000B1AA01 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0B89EDCF2F3F8BFF00E848E4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

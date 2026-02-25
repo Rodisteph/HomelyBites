@@ -7,6 +7,7 @@ final class HostDashboardViewModel: ObservableObject {
     @Published var hostMeals: [Meal] = []
     @Published var isLoading = false
     @Published var isActivatingPayments = false
+    @Published var isRefreshingStripe = false
     @Published var isDeletingMeal = false
     @Published var onboardingURL: URL?
     @Published var errorMessage: String?
@@ -71,17 +72,46 @@ final class HostDashboardViewModel: ObservableObject {
         #endif
 
         do {
-            let accountId = try await functionsService.createConnectAccount()
+            let session = try await functionsService.createConnectAccount()
             #if DEBUG
-            debugLog("[HostDashboard][activatePayments] accountId=\(accountId)")
+            debugLog("[HostDashboard][activatePayments] accountId=\(session.accountId) status=\(session.status) alreadyExists=\(session.alreadyExists)")
             #endif
-            onboardingURL = try await functionsService.createOnboardingLink()
+
+            if let onboardingURLFromSession = session.onboardingURL {
+                onboardingURL = onboardingURLFromSession
+            } else if session.status != "enabled" {
+                onboardingURL = try await functionsService.createOnboardingLink()
+            } else {
+                successMessage = "Paiements deja actifs."
+            }
             #if DEBUG
             debugLog("[HostDashboard][activatePayments] onboardingURL=\(onboardingURL?.absoluteString ?? "nil")")
             #endif
         } catch {
             #if DEBUG
             logNSErrorDetails(error, context: "activatePayments")
+            #endif
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func refreshStripeStatus() async {
+        isRefreshingStripe = true
+        defer { isRefreshingStripe = false }
+
+        #if DEBUG
+        debugLog("[HostDashboard][refreshStripeStatus] start")
+        #endif
+
+        do {
+            let status = try await functionsService.refreshStripeStatus()
+            successMessage = "Stripe: \(status.stripeStatus)"
+            #if DEBUG
+            debugLog("[HostDashboard][refreshStripeStatus] accountId=\(status.accountId) status=\(status.stripeStatus) onboarded=\(status.stripeOnboarded)")
+            #endif
+        } catch {
+            #if DEBUG
+            logNSErrorDetails(error, context: "refreshStripeStatus")
             #endif
             errorMessage = error.localizedDescription
         }
@@ -129,8 +159,11 @@ final class HostDashboardViewModel: ObservableObject {
         }
 
         do {
-            try await firestoreService.deleteMeal(mealId: meal.id, hostId: hostId)
+            try await functionsService.deleteMeal(mealId: meal.id)
             hostMeals.removeAll { $0.id == meal.id }
+            if !hostId.isEmpty {
+                hostMeals = try await firestoreService.fetchMeals(hostId: hostId)
+            }
             successMessage = "Plat supprime."
             #if DEBUG
             debugLog("[HostDashboard][deleteMeal] removed local mealId=\(meal.id)")

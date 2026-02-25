@@ -20,6 +20,19 @@ struct SettingsView: View {
                         Text(user.role.displayTitle)
                             .foregroundStyle(.secondary)
                     }
+
+                    if user.isHost {
+                        HStack {
+                            Text("Niveau")
+                            Spacer()
+                            Text(ChefLevel(rawValue: user.chefLevel ?? "")?.displayTitle ?? "Non defini")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        NavigationLink("Modifier le profil host") {
+                            ProfileView()
+                        }
+                    }
                 }
             }
 

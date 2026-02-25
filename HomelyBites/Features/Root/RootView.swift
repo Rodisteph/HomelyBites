@@ -7,21 +7,14 @@ struct RootView: View {
     var body: some View {
         Group {
             if session.isBootstrapping {
-                ProgressView("Chargement...")
-                    .tint(AppColors.primary)
+                SplashView()
             } else if session.isAuthenticated {
                 authenticatedTabs
-                    .overlay(alignment: .topTrailing) {
-                        BrandLogoView(size: 28)
-                            .padding(.top, 6)
-                            .padding(.trailing, 10)
-                            .allowsHitTesting(false)
-                    }
             } else {
                 AuthView(authService: container.authService)
             }
         }
-        .background(AppColors.background.ignoresSafeArea())
+        .background(AppColors.cream.ignoresSafeArea())
         .alert(
             "Erreur",
             isPresented: Binding(
@@ -46,6 +39,13 @@ struct RootView: View {
                 Label("Repas", systemImage: "fork.knife")
             }
 
+            NavigationStack {
+                MapView()
+            }
+            .tabItem {
+                Label("Map", systemImage: "map")
+            }
+
             if session.appUser?.role == .client {
                 NavigationStack {
                     OrdersView()
@@ -68,10 +68,70 @@ struct RootView: View {
             }
 
             NavigationStack {
+                ProfileView()
+            }
+            .tabItem {
+                Label("Profil", systemImage: "person.crop.circle")
+            }
+
+            NavigationStack {
                 SettingsView()
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
+            }
+        }
+        .tint(AppColors.terracotta)
+    }
+}
+
+// MARK: - Splash View
+private struct SplashView: View {
+    @State private var scale: CGFloat = 0.8
+    @State private var opacity: Double = 0
+
+    var body: some View {
+        ZStack {
+            // Background Gradient
+            LinearGradient(
+                colors: [AppColors.cream, AppColors.creamDark],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                // Brand Logo with Animation
+                BrandLogoView(size: 120)
+                    .scaleEffect(scale)
+                    .opacity(opacity)
+
+                // Brand Name
+                VStack(spacing: 8) {
+                    Text("HomelyBites")
+                        .font(.cormorantDisplay(42, weight: .semibold))
+                        .foregroundStyle(AppColors.charcoal)
+
+                    Text("Cuisine locale, faite maison")
+                        .font(.bodyLarge)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+                .opacity(opacity)
+
+                // Loading Indicator
+                ProgressView()
+                    .tint(AppColors.terracotta)
+                    .scaleEffect(1.2)
+                    .padding(.top, 20)
+                    .opacity(opacity)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                scale = 1.0
+            }
+            withAnimation(.easeIn(duration: 0.4)) {
+                opacity = 1.0
             }
         }
     }

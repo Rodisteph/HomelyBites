@@ -1,62 +1,109 @@
 import SwiftUI
-import StripePaymentSheet
+import PassKit
 
 struct CheckoutView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: CheckoutViewModel
-
     let onPaymentCompleted: () -> Void
 
     init(
         orderId: String,
-        clientSecret: String,
+        amountCents: Int,
+        itemLabel: String,
         onPaymentCompleted: @escaping () -> Void
     ) {
         _viewModel = StateObject(
             wrappedValue: CheckoutViewModel(
                 orderId: orderId,
-                clientSecret: clientSecret
+                amountCents: amountCents,
+                itemLabel: itemLabel
             )
         )
         self.onPaymentCompleted = onPaymentCompleted
     }
 
     var body: some View {
-        let content =
-        NavigationStack {
-            VStack(spacing: 16) {
-                Text("Checkout")
-                    .font(.title3.weight(.semibold))
+        ZStack {
+            AppColors.cream.ignoresSafeArea()
 
-                Text("Order ID: \(viewModel.orderId)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            VStack(spacing: 28) {
+                Spacer()
 
+                // Header
+                VStack(spacing: 12) {
+                    BrandLogoView(size: 64)
+
+                    Text("Confirm Order")
+                        .font(.cormorantDisplay(32, weight: .semibold))
+                        .foregroundStyle(AppColors.charcoal)
+
+                    Text("Order #\(viewModel.orderId.prefix(8))")
+                        .font(.dmSans(13, weight: .medium))
+                        .foregroundStyle(AppColors.muted)
+                }
+
+                // Loading
                 if viewModel.isPreparing {
-                    ProgressView("Preparation du paiement...")
+                    ProgressView()
+                        .tint(AppColors.primary)
+                        .scaleEffect(1.2)
                 }
 
-                if let message = viewModel.statusMessage {
-                    Text(message)
-                        .font(.footnote)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
+                // Status Message
+                if let msg = viewModel.statusMessage {
+                    HStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 20))
+                        Text(msg)
+                            .font(.dmSans(14, weight: .medium))
+                    }
+                    .foregroundStyle(AppColors.success)
+                    .multilineTextAlignment(.center)
+                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(AppColors.success.opacity(0.1))
+                    )
+                    .padding(.horizontal, AppMetrics.horizontalPadding)
                 }
 
-                Button("Payer maintenant") {
-                    Task { await viewModel.preparePaymentIfNeeded() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isPreparing)
+                Spacer()
 
-                Button("Fermer") { dismiss() }
+                // Apple Pay Button
+                VStack(spacing: 16) {
+                    ApplePayButton(
+                        amount: viewModel.amountCents,
+                        onSuccess: { token in
+                            Task {
+                                await viewModel.handleApplePayToken(token)
+                                if viewModel.paymentSucceeded {
+                                    onPaymentCompleted()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                        dismiss()
+                                    }
+                                }
+                            }
+                        },
+                        onError: { error in
+                            viewModel.errorMessage = error.localizedDescription
+                        }
+                    )
+                    .frame(height: 52)
+                    .padding(.horizontal, AppMetrics.horizontalPadding)
+
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .padding(.horizontal, AppMetrics.horizontalPadding)
+                }
+                .padding(.bottom, 36)
             }
-            .padding()
-            .navigationBarTitleDisplayMode(.inline)
-            .task { await viewModel.preparePaymentIfNeeded() }
         }
+        .navigationBarHidden(true)
         .alert(
-            "Erreur paiement",
+            "Payment Error",
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
@@ -64,22 +111,5 @@ struct CheckoutView: View {
             actions: { Button("OK", role: .cancel) {} },
             message: { Text(viewModel.errorMessage ?? "") }
         )
-
-        // ✅ Applique paymentSheet uniquement si non-nil
-        if let sheet = viewModel.paymentSheet {
-            content
-                .paymentSheet(
-                    isPresented: $viewModel.isPresentingPaymentSheet,
-                    paymentSheet: sheet
-                ) { result in
-                    viewModel.handlePaymentResult(result)
-                    if case .completed = result {
-                        onPaymentCompleted()
-                        dismiss()
-                    }
-                }
-        } else {
-            content
-        }
     }
 }

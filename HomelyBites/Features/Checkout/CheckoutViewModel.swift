@@ -1,73 +1,60 @@
 import Foundation
-import StripePaymentSheet
+import PassKit
 
 @MainActor
 final class CheckoutViewModel: ObservableObject {
-    @Published var paymentSheet: PaymentSheet?
     @Published var isPreparing = false
-    @Published var isPresentingPaymentSheet = false
     @Published var statusMessage: String?
     @Published var errorMessage: String?
+    @Published var paymentSucceeded = false
 
     let orderId: String
-    private let clientSecret: String
+    let amountCents: Int
+    let itemLabel: String
 
-    init(orderId: String, clientSecret: String) {
+    private let functionsService: CloudFunctionsService
+
+    init(
+        orderId: String,
+        amountCents: Int,
+        itemLabel: String,
+        functionsService: CloudFunctionsService = CloudFunctionsService()
+    ) {
         self.orderId = orderId
-        self.clientSecret = clientSecret
+        self.amountCents = amountCents
+        self.itemLabel = itemLabel
+        self.functionsService = functionsService
     }
 
-    func preparePaymentIfNeeded() async {
-        if paymentSheet != nil {
-            isPresentingPaymentSheet = true
-            return
-        }
-
+    func handleApplePayToken(_ token: PKPaymentToken) async {
         isPreparing = true
         defer { isPreparing = false }
 
         #if DEBUG
-        debugLog("[Checkout][preparePayment] start orderId=\(orderId) clientSecret=\(redacted(clientSecret))")
+        debugLog("[Checkout][handleApplePayToken] start orderId=\(orderId)")
         #endif
 
-        var configuration = PaymentSheet.Configuration()
-        configuration.merchantDisplayName = "HomelyBites"
-        configuration.returnURL = "homelybites://stripe-redirect"
-        configuration.allowsDelayedPaymentMethods = false
+        do {
+            let tokenData = token.paymentData
+            let tokenString = tokenData.base64EncodedString()
 
-        paymentSheet = PaymentSheet(paymentIntentClientSecret: clientSecret, configuration: configuration)
-        isPresentingPaymentSheet = true
+            try await functionsService.confirmPaymentWithApplePay(
+                orderId: orderId,
+                applePayToken: tokenString
+            )
 
-        #if DEBUG
-        debugLog("[Checkout][preparePayment] paymentSheet ready")
-        #endif
-    }
+            statusMessage = "Payment confirmed. Check your Orders tab."
+            paymentSucceeded = true
 
-    func handlePaymentResult(_ result: PaymentSheetResult) {
-        switch result {
-        case .completed:
-            statusMessage = "Paiement envoye. Confirmation en cours via webhook Stripe."
             #if DEBUG
-            debugLog("[Checkout][handlePaymentResult] completed orderId=\(orderId)")
+            debugLog("[Checkout][handleApplePayToken] success orderId=\(orderId)")
             #endif
-        case .canceled:
-            statusMessage = "Paiement annule."
+        } catch {
             #if DEBUG
-            debugLog("[Checkout][handlePaymentResult] canceled orderId=\(orderId)")
-            #endif
-        case .failed(let error):
-            #if DEBUG
-            logNSErrorDetails(error, context: "handlePaymentResult")
+            logNSErrorDetails(error, context: "handleApplePayToken")
             #endif
             errorMessage = error.localizedDescription
         }
-    }
-
-    private func redacted(_ value: String) -> String {
-        guard value.count > 12 else {
-            return "***"
-        }
-        return "\(value.prefix(8))...\(value.suffix(4))"
     }
 
     private func debugLog(_ message: String) {

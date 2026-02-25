@@ -2,13 +2,10 @@ import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
-// MARK: - Firestore Async helpers (sans FirebaseFirestoreSwift)
 extension DocumentReference {
-
-    /// Remplace setData(from:) (FirestoreSwift) par setData([String:Any])
-    func setDataAsync(_ data: [String: Any], merge: Bool = false) async throws {
+    func setDataAsync(_ fields: [String: Any], merge: Bool = false) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            self.setData(data, merge: merge) { error in
+            self.setData(fields, merge: merge) { error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
@@ -18,16 +15,25 @@ extension DocumentReference {
         }
     }
 
-    func updateDataAsync(_ fields: [AnyHashable: Any]) async throws {
+    func setData<T: Encodable>(from value: T, merge: Bool = false) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            self.updateData(fields) { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
+            do {
+                try self.setData(from: value, merge: merge) { error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: ())
+                    }
                 }
+            } catch {
+                continuation.resume(throwing: error)
             }
         }
+    }
+
+    func getDocument<T: Decodable>(as type: T.Type) async throws -> T {
+        let snapshot = try await getDocumentAsync()
+        return try snapshot.data(as: T.self)
     }
 
     func getDocumentAsync() async throws -> DocumentSnapshot {
@@ -46,6 +52,18 @@ extension DocumentReference {
         }
     }
 
+    func updateDataAsync(_ fields: [String: Any]) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.updateData(fields) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
+    }
+
     func deleteAsync() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.delete { error in
@@ -60,6 +78,11 @@ extension DocumentReference {
 }
 
 extension Query {
+    func getDocuments<T: Decodable>(as type: T.Type) async throws -> [T] {
+        let snapshot = try await getDocumentsAsync()
+        return try snapshot.documents.map { try $0.data(as: T.self) }
+    }
+
     func getDocumentsAsync() async throws -> QuerySnapshot {
         try await withCheckedThrowingContinuation { continuation in
             self.getDocuments { snapshot, error in
@@ -102,7 +125,7 @@ extension Auth {
                     return
                 }
                 guard let result else {
-                    continuation.resume(throwing: AppError.invalidResponse)
+                    continuation.resume(throwing: error ?? AppError.invalidResponse)
                     return
                 }
                 continuation.resume(returning: result)

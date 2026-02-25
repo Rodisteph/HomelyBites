@@ -1,8 +1,12 @@
+// PREREQUIS : Signing & Capabilities -> Apple Pay -> ajouter merchant.com.homelybites
+// PREREQUIS : Apple Developer Portal -> Certificates -> Merchant IDs -> creer merchant.com.homelybites
+// PREREQUIS : Tester sur device reel uniquement (Apple Pay = non disponible sur simulateur)
 import SwiftUI
-import StripeCore
+import PassKit
 import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
+import StripeCore
 
 
 @main
