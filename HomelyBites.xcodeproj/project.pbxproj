@@ -29,18 +29,18 @@
 
 /* Begin PBXFileReference section */
 		0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
-		0BC8F0012F9A200100B1AA01 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = HomelyBites/Config.xcconfig; sourceTree = "<group>"; };
+		0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = HomelyBites/Config.xcconfig; sourceTree = "<group>"; };
 		11B1A0012E7F2FFA00428788 /* HomelyBites.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomelyBites.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		12AA3ED3A46F5628B907BF00 /* DMSans-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "DMSans-Bold.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Bold.ttf"; sourceTree = "<group>"; };
+		12AA3ED3A46F5628B907BF00 /* DMSans-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-Bold.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Bold.ttf"; sourceTree = "<group>"; };
 		2B66A614AF94563ED4C81C99 /* HomelyBites.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = HomelyBites.entitlements; path = HomelyBites/HomelyBites.entitlements; sourceTree = "<group>"; };
-		340C2E1AB9D6D3A2010552FB /* CormorantGaramond-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "CormorantGaramond-Regular.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Regular.ttf"; sourceTree = "<group>"; };
-		34BC868A4D5B940331FAA680 /* DMSans-Medium.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "DMSans-Medium.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Medium.ttf"; sourceTree = "<group>"; };
-		4C1826631F59E989B59D6D1A /* DMSans-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "DMSans-Regular.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Regular.ttf"; sourceTree = "<group>"; };
-		7AEDF8C47243FDD5E7FCBE50 /* CormorantGaramond-Medium.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "CormorantGaramond-Medium.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Medium.ttf"; sourceTree = "<group>"; };
-		A2A4F495BEA410121E768D73 /* CormorantGaramond-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "CormorantGaramond-SemiBold.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-SemiBold.ttf"; sourceTree = "<group>"; };
-		A73BB5B57A73A4E4CB925082 /* DMSans-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "DMSans-SemiBold.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-SemiBold.ttf"; sourceTree = "<group>"; };
-		DA43CE5004F2DF159D3DA647 /* CormorantGaramond-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "CormorantGaramond-Italic.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Italic.ttf"; sourceTree = "<group>"; };
-		F24B53C71C5F2A43A99FEBBF /* CormorantGaramond-MediumItalic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "CormorantGaramond-MediumItalic.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-MediumItalic.ttf"; sourceTree = "<group>"; };
+		340C2E1AB9D6D3A2010552FB /* CormorantGaramond-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-Regular.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Regular.ttf"; sourceTree = "<group>"; };
+		34BC868A4D5B940331FAA680 /* DMSans-Medium.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-Medium.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Medium.ttf"; sourceTree = "<group>"; };
+		4C1826631F59E989B59D6D1A /* DMSans-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-Regular.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-Regular.ttf"; sourceTree = "<group>"; };
+		7AEDF8C47243FDD5E7FCBE50 /* CormorantGaramond-Medium.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-Medium.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Medium.ttf"; sourceTree = "<group>"; };
+		A2A4F495BEA410121E768D73 /* CormorantGaramond-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-SemiBold.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-SemiBold.ttf"; sourceTree = "<group>"; };
+		A73BB5B57A73A4E4CB925082 /* DMSans-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "DMSans-SemiBold.ttf"; path = "HomelyBites/Resources/Fonts/DMSans-SemiBold.ttf"; sourceTree = "<group>"; };
+		DA43CE5004F2DF159D3DA647 /* CormorantGaramond-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-Italic.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-Italic.ttf"; sourceTree = "<group>"; };
+		F24B53C71C5F2A43A99FEBBF /* CormorantGaramond-MediumItalic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "CormorantGaramond-MediumItalic.ttf"; path = "HomelyBites/Resources/Fonts/CormorantGaramond-MediumItalic.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -97,7 +97,7 @@
 				0BA077352F3F85B00029C4B4 /* Frameworks */,
 				11B1A0052E7F2FFA00428788 /* Products */,
 				0BB9EF3C2F46075300FF52F0 /* GoogleService-Info.plist */,
-				0BC8F0012F9A200100B1AA01 /* Config.xcconfig */,
+				0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */,
 				DA43CE5004F2DF159D3DA647 /* CormorantGaramond-Italic.ttf */,
 				7AEDF8C47243FDD5E7FCBE50 /* CormorantGaramond-Medium.ttf */,
 				F24B53C71C5F2A43A99FEBBF /* CormorantGaramond-MediumItalic.ttf */,
@@ -338,7 +338,7 @@
 		};
 		11B1A00E2E7F2FFD00428788 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 0BC8F0012F9A200100B1AA01 /* Config.xcconfig */;
+			baseConfigurationReference = 0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -362,7 +362,7 @@
 		};
 		11B1A00F2E7F2FFD00428788 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 0BC8F0012F9A200100B1AA01 /* Config.xcconfig */;
+			baseConfigurationReference = 0BC8F0012F9A200100B1AA01 /* HomelyBites/Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

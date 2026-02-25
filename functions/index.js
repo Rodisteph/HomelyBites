@@ -1657,6 +1657,133 @@ exports.stripeWebhook = onRequest(
     },
 );
 
+exports.confirmApplePayPayment = onCall(
+    {
+      region: REGION,
+      secrets: [STRIPE_SECRET_KEY],
+    },
+    async (request) => {
+      const uid = assertAuthenticated(request);
+      const orderId = request.data ?.orderId;
+      const applePayToken = request.data ?.applePayToken;
+
+      logger.info('confirmApplePayPayment called', {
+        functionName: 'confirmApplePayPayment',
+        uid,
+        orderId: typeof orderId === 'string' ? orderId : null,
+      });
+
+      if (!orderId || typeof orderId !== 'string') {
+        throw new HttpsError('invalid-argument', 'orderId is required.');
+      }
+      if (!applePayToken || typeof applePayToken !== 'string') {
+        throw new HttpsError('invalid-argument', 'applePayToken is required.');
+      }
+
+      let step = 'load_order';
+      try {
+        const orderRef = db.collection('orders').doc(orderId);
+        const orderSnapshot = await orderRef.get();
+
+        if (!orderSnapshot.exists) {
+          throw new HttpsError('not-found', 'Order not found.');
+        }
+
+        const order = orderSnapshot.data();
+        if (!order) {
+          throw new HttpsError('internal', 'Order payload missing.');
+        }
+
+        if (order.clientId !== uid) {
+          throw new HttpsError('permission-denied', 'Not your order.');
+        }
+
+        const paymentIntentId = getStringField(order.paymentIntentId);
+        if (!paymentIntentId) {
+          throw new HttpsError('failed-precondition', 'Order missing paymentIntentId.');
+        }
+
+        if (order.paymentStatus === PAYMENT_STATUS.PAID) {
+          logger.info('confirmApplePayPayment order already paid', {
+            functionName: 'confirmApplePayPayment',
+            uid,
+            orderId,
+            paymentIntentId,
+          });
+          return {
+            ok: true,
+            orderId,
+            paymentIntentId,
+            alreadyPaid: true,
+          };
+        }
+
+        step = 'create_payment_method';
+        const stripe = getStripeClient();
+        const paymentMethod = await stripe.paymentMethods.create({
+          type: 'card',
+          card: {
+            token: applePayToken,
+          },
+        });
+
+        step = 'confirm_payment_intent';
+        const confirmedIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
+          payment_method: paymentMethod.id,
+        });
+
+        if (confirmedIntent.status !== 'succeeded') {
+          logger.warn('confirmApplePayPayment PaymentIntent not succeeded', {
+            functionName: 'confirmApplePayPayment',
+            uid,
+            orderId,
+            paymentIntentId,
+            status: confirmedIntent.status,
+          });
+          throw new HttpsError('failed-precondition', 'Payment not confirmed.');
+        }
+
+        step = 'update_order';
+        await orderRef.set({
+          paymentStatus: PAYMENT_STATUS.PAID,
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+
+        logger.info('confirmApplePayPayment success', {
+          functionName: 'confirmApplePayPayment',
+          uid,
+          orderId,
+          paymentIntentId,
+        });
+
+        return {
+          ok: true,
+          orderId,
+          paymentIntentId,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        logger.error('confirmApplePayPayment failed', {
+          functionName: 'confirmApplePayPayment',
+          uid,
+          orderId: typeof orderId === 'string' ? orderId : null,
+          step,
+          stripeRequestId: getStripeRequestId(error),
+          stripeType: error && error.type ? error.type : null,
+          stripeCode: error && error.code ? error.code : null,
+          stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError('internal', 'Unable to confirm Apple Pay payment.');
+      }
+    },
+);
+
 exports.callOpenAIAgent = onRequest(
     {
       region: 'europe-west1',

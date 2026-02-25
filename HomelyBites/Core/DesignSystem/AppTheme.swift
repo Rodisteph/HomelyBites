@@ -3,29 +3,36 @@ import SwiftUI
 import UIKit
 #endif
 
-// MARK: - Design System Colors (Terracotta/Cream/Charcoal Palette)
+// MARK: - Design System Colors (Using Color Assets for Dark Mode Support)
 enum AppColors {
-    // Primary palette
-    static let terracotta = Color(hex: "D4856A")      // Warm terracotta
-    static let cream = Color(hex: "FAF8F3")           // Soft cream
-    static let charcoal = Color(hex: "2D2D2D")        // Deep charcoal
+    // Primary palette from Color Assets
+    static let primary      = Color("Primary")        // Terracotta #C4623A
+    static let primaryDark  = Color("PrimaryDark")    // Darker terracotta #9B4A2A
+    static let primaryLight = Color("PrimaryLight")   // Light terracotta #F2D5C8
+    static let charcoal     = Color("Charcoal")       // Deep charcoal #2C2825
+    static let cream        = Color("Cream")          // Soft cream #FAF7F2
+    static let muted        = Color("Muted")          // Muted gray #A09890
+    static let border       = Color("Border")         // Border gray #EDE8E2
+    static let sage         = Color("Sage")           // Sage green #7A8C6E
 
     // Semantic colors
-    static let primary = terracotta
-    static let background = cream
-    static let surface = Color.white
-    static let textPrimary = charcoal
-    static let textSecondary = Color(hex: "6B6B6B")   // Medium gray
+    static let background   = Color("Cream")
+    static let surface      = Color.white
+    static let textPrimary  = Color("Charcoal")
+    static let textSecondary = Color("Muted")
 
-    // Status colors
-    static let success = Color(hex: "2E7D32")
-    static let warning = Color(hex: "ED6C02")
-    static let danger = Color(hex: "C62828")
+    // Status colors from Color Assets
+    static let success = Color("Success")             // Green #4A7C59
+    static let danger  = Color("Danger")              // Red #B04040
+    static let warning = Color("Primary")             // Reuse terracotta for warnings
+    static let info    = Color("Info")                // Blue #3A6B9B
 
-    // Additional accents
-    static let terracottaLight = Color(hex: "E5A892")
-    static let terracottaDark = Color(hex: "B86A52")
-    static let creamDark = Color(hex: "F0EDE5")
+    // Legacy aliases (kept for backward compatibility)
+    static let terracotta      = primary
+    static let terracottaLight = primaryLight
+    static let terracottaDark  = primaryDark
+    static let creamDark       = border
+    static let secondary       = sage
 }
 
 // MARK: - Typography Extensions

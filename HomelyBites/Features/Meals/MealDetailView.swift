@@ -244,7 +244,8 @@ struct MealDetailView: View {
             if let checkoutSession = viewModel.checkoutSession {
                 CheckoutView(
                     orderId: checkoutSession.orderId,
-                    clientSecret: checkoutSession.clientSecret
+                    amountCents: viewModel.totalPriceCents,
+                    itemLabel: viewModel.meal.title
                 ) {
                     viewModel.paymentDidComplete()
                 }
