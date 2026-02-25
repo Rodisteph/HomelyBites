@@ -10,13 +10,6 @@ struct RootView: View {
                 SplashView()
             } else if session.isAuthenticated {
                 authenticatedTabs
-                    .overlay(alignment: .topTrailing) {
-                        BrandLogoView(size: 32)
-                            .padding(.top, 8)
-                            .padding(.trailing, 12)
-                            .allowsHitTesting(false)
-                            .opacity(0.8)
-                    }
             } else {
                 AuthView(authService: container.authService)
             }

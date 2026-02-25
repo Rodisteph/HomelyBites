@@ -19,30 +19,38 @@ struct MapView: View {
                 ProgressView("Chargement de la carte...")
                     .tint(AppColors.primary)
             } else if filteredPins.isEmpty {
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     ContentUnavailableView(
-                        "Aucun repas geo-localise",
+                        "Aucun repas disponible",
                         systemImage: "map",
-                        description: Text("Ajoute une location au meal (GeoPoint) ou lance le backfill location.")
+                        description: Text("Les repas apparaîtront sur la carte dès qu'ils seront publiés avec une localisation.")
                     )
 
                     #if DEBUG
-                    Button {
-                        Task { await backfillLocationsDevOnly() }
-                    } label: {
-                        if isBackfillingLocations {
-                            HStack {
-                                ProgressView()
-                                Text("Backfill location...")
+                    VStack(spacing: 8) {
+                        Text("Debug: \(viewModel.pins.count) repas trouvés sans localisation")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+
+                        Button {
+                            Task { await backfillLocationsDevOnly() }
+                        } label: {
+                            if isBackfillingLocations {
+                                HStack {
+                                    ProgressView()
+                                    Text("Backfill en cours...")
+                                }
+                            } else {
+                                Text("Backfill localisation (dev only)")
                             }
-                        } else {
-                            Text("Backfill location (dev only)")
                         }
+                        .buttonStyle(PrimaryButtonStyle(isLoading: isBackfillingLocations))
+                        .disabled(isBackfillingLocations)
                     }
-                    .buttonStyle(PrimaryButtonStyle(isLoading: isBackfillingLocations))
-                    .disabled(isBackfillingLocations)
+                    .padding(.horizontal, 20)
                     #endif
                 }
+                .padding(.horizontal, 20)
             } else {
                 VStack(spacing: 0) {
                     controls

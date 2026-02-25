@@ -58,29 +58,40 @@ struct ProfileView: View {
                 Section("HACCP") {
                     if viewModel.hasAcceptedHaccp {
                         Text("Validation HACCP active (version \(viewModel.haccpVersion)).")
+                            .font(.caption)
                             .foregroundStyle(AppColors.success)
                     } else {
                         Text("Validation HACCP requise avant publication d'un repas.")
+                            .font(.caption)
                             .foregroundStyle(AppColors.warning)
                     }
 
-                    Button {
-                        Task {
-                            await viewModel.acknowledgeHaccp()
-                            await session.refreshUserProfile()
-                        }
-                    } label: {
-                        if viewModel.isAcknowledgingHaccp {
-                            HStack {
-                                ProgressView()
-                                Text("Validation...")
+                    Toggle(isOn: Binding(
+                        get: { viewModel.hasAcceptedHaccp },
+                        set: { newValue in
+                            if newValue && !viewModel.hasAcceptedHaccp {
+                                Task {
+                                    await viewModel.acknowledgeHaccp()
+                                    await session.refreshUserProfile()
+                                }
                             }
-                        } else {
-                            Text("J'ai pris connaissance des regles HACCP")
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("J'ai pris connaissance des règles de sécurité alimentaire (HACCP)")
+                                .font(.bodyMedium)
+                            if viewModel.isAcknowledgingHaccp {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Validation en cours...")
+                                        .font(.caption)
+                                        .foregroundStyle(AppColors.textSecondary)
+                                }
+                            }
                         }
                     }
-                    .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isAcknowledgingHaccp))
-                    .disabled(viewModel.isAcknowledgingHaccp || viewModel.hasAcceptedHaccp)
+                    .disabled(viewModel.isAcknowledgingHaccp)
                 }
             }
 

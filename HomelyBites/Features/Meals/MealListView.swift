@@ -80,7 +80,6 @@ struct MealListView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
         }
-        .scrollContentBackground(.hidden)
         .background(AppColors.cream)
         .navigationTitle("Repas")
         .searchable(text: $searchText, prompt: "Rechercher un plat, un host...")
