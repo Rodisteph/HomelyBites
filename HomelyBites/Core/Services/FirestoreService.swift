@@ -54,10 +54,43 @@ final class FirestoreService {
     // MARK: - Meals
 
     func fetchMeals() async throws -> [Meal] {
-        let snapshot = try await db.collection("meals").getDocumentsAsync()
-        let meals = try snapshot.documents.map { try decodeMealDocument($0) }
-        return meals.sorted {
-            ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
+        #if DEBUG
+        NSLog("🔄 [FirestoreService.fetchMeals] Starting Firestore query for meals collection...")
+        #endif
+
+        do {
+            let snapshot = try await db.collection("meals").getDocumentsAsync()
+
+            #if DEBUG
+            NSLog("✅ [FirestoreService.fetchMeals] Firestore query completed")
+            NSLog("✅ [FirestoreService.fetchMeals] Document count: \(snapshot.documents.count)")
+            #endif
+
+            let meals = try snapshot.documents.map { doc in
+                #if DEBUG
+                NSLog("🔄 [FirestoreService.fetchMeals] Decoding meal document: \(doc.documentID)")
+                #endif
+                return try decodeMealDocument(doc)
+            }
+
+            let sorted = meals.sorted {
+                ($0.createdAt?.dateValue() ?? .distantPast) > ($1.createdAt?.dateValue() ?? .distantPast)
+            }
+
+            #if DEBUG
+            NSLog("✅ [FirestoreService.fetchMeals] Returning \(sorted.count) sorted meals")
+            #endif
+
+            return sorted
+        } catch {
+            let nsError = error as NSError
+            #if DEBUG
+            NSLog("❌ [FirestoreService.fetchMeals] Firestore query failed")
+            NSLog("❌ [FirestoreService.fetchMeals] Error domain: \(nsError.domain)")
+            NSLog("❌ [FirestoreService.fetchMeals] Error code: \(nsError.code)")
+            NSLog("❌ [FirestoreService.fetchMeals] Error description: \(nsError.localizedDescription)")
+            #endif
+            throw error
         }
     }
 

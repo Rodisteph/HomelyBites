@@ -36,12 +36,22 @@ final class HostDashboardViewModel: ObservableObject {
         currentHostId = hostId
         guard listener == nil else { return }
 
+        #if DEBUG
+        NSLog("🔄 [HostDashboardViewModel] Starting to listen for orders for host: \(hostId)")
+        #endif
+
         listener = firestoreService.listenHostOrders(hostId: hostId) { [weak self] result in
             Task { @MainActor in
                 switch result {
                 case .success(let orders):
                     self?.receivedOrders = orders
+                    #if DEBUG
+                    NSLog("✅ [HostDashboardViewModel] Received \(orders.count) orders via listener")
+                    #endif
                 case .failure(let error):
+                    #if DEBUG
+                    NSLog("❌ [HostDashboardViewModel] Listener error: \(error.localizedDescription)")
+                    #endif
                     self?.errorMessage = error.localizedDescription
                 }
             }
@@ -53,12 +63,27 @@ final class HostDashboardViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        #if DEBUG
+        NSLog("🔄 [HostDashboardViewModel] Starting refresh for host: \(hostId)")
+        #endif
+
         do {
             async let orders = firestoreService.fetchHostOrders(hostId: hostId)
             async let meals = firestoreService.fetchMeals(hostId: hostId)
-            receivedOrders = try await orders
-            hostMeals = try await meals
+
+            let (fetchedOrders, fetchedMeals) = try await (orders, meals)
+            receivedOrders = fetchedOrders
+            hostMeals = fetchedMeals
+
+            #if DEBUG
+            NSLog("✅ [HostDashboardViewModel] Refresh complete: \(receivedOrders.count) orders, \(hostMeals.count) meals")
+            #endif
         } catch {
+            let nsError = error as NSError
+            #if DEBUG
+            NSLog("❌ [HostDashboardViewModel] Refresh failed")
+            NSLog("❌ [HostDashboardViewModel] Error: \(nsError.localizedDescription)")
+            #endif
             errorMessage = error.localizedDescription
         }
     }

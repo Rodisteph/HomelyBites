@@ -235,15 +235,27 @@ private final class MapViewModel: ObservableObject {
     private lazy var db = Firestore.firestore()
 
     func loadPins() async {
+        #if DEBUG
+        NSLog("🔄 [MapViewModel] Starting to load map pins...")
+        #endif
+
         isLoading = true
         defer { isLoading = false }
 
         do {
             let snapshot = try await db.collection("meals").getDocumentsAsync()
+
+            #if DEBUG
+            NSLog("✅ [MapViewModel] Fetched \(snapshot.documents.count) meal documents from Firestore")
+            #endif
+
             let parsed: [MealMapPin] = snapshot.documents.compactMap { document in
                 let data = document.data()
                 guard let coordinate = Self.coordinate(from: data),
                       var meal = try? document.data(as: Meal.self) else {
+                    #if DEBUG
+                    NSLog("⚠️ [MapViewModel] Skipping document \(document.documentID) - no valid coordinates or failed to decode")
+                    #endif
                     return nil
                 }
 
@@ -267,7 +279,16 @@ private final class MapViewModel: ObservableObject {
                 )
             }
             pins = parsed
+
+            #if DEBUG
+            NSLog("✅ [MapViewModel] Successfully parsed \(pins.count) pins with valid coordinates")
+            #endif
         } catch {
+            let nsError = error as NSError
+            #if DEBUG
+            NSLog("❌ [MapViewModel] Failed to load pins")
+            NSLog("❌ [MapViewModel] Error: \(nsError.localizedDescription)")
+            #endif
             errorMessage = error.localizedDescription
         }
     }

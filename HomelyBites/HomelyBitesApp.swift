@@ -16,9 +16,24 @@ struct HomelyBitesApp: App {
     @StateObject private var sessionViewModel: SessionViewModel
 
     init() {
+        #if DEBUG
+        NSLog("🚀 [HomelyBitesApp] App initializing...")
+        #endif
+
         if FirebaseApp.app() == nil {
+            #if DEBUG
+            NSLog("🔄 [HomelyBitesApp] Configuring Firebase...")
+            #endif
             FirebaseApp.configure()
+            #if DEBUG
+            NSLog("✅ [HomelyBitesApp] Firebase configured successfully")
+            #endif
+        } else {
+            #if DEBUG
+            NSLog("✅ [HomelyBitesApp] Firebase already configured")
+            #endif
         }
+
         Self.logFirebaseBundleConfiguration()
         Self.logFirebaseRuntimeConfiguration()
         Self.logGoogleSignInConfiguration()
@@ -26,9 +41,18 @@ struct HomelyBitesApp: App {
         Self.runDebugSignInProbeIfRequested()
         Self.runDebugSignUpProbeIfRequested()
         StripeInitializer.configure()
+
+        #if DEBUG
+        NSLog("🔄 [HomelyBitesApp] Creating AppContainer and SessionViewModel...")
+        #endif
+
         let container = AppContainer()
         _container = StateObject(wrappedValue: container)
         _sessionViewModel = StateObject(wrappedValue: container.makeSessionViewModel())
+
+        #if DEBUG
+        NSLog("✅ [HomelyBitesApp] App initialization complete")
+        #endif
     }
 
     var body: some Scene {
