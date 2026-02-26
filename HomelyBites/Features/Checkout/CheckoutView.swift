@@ -1,9 +1,10 @@
 import SwiftUI
-import PassKit
+import StripePaymentSheet
 
 struct CheckoutView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: CheckoutViewModel
+    @State private var hasCompleted = false
     let onPaymentCompleted: () -> Void
 
     init(
@@ -26,82 +27,95 @@ struct CheckoutView: View {
         ZStack {
             AppColors.cream.ignoresSafeArea()
 
-            VStack(spacing: 28) {
+            VStack(spacing: 24) {
                 Spacer()
 
-                // Header
-                VStack(spacing: 12) {
-                    BrandLogoView(size: 64)
-
-                    Text("Confirm Order")
-                        .font(.cormorantDisplay(32, weight: .semibold))
+                VStack(spacing: 10) {
+                    BrandLogoView(size: 62)
+                    Text("Confirmer le paiement")
+                        .font(.cormorantDisplay(30, weight: .semibold))
                         .foregroundStyle(AppColors.charcoal)
-
                     Text("Order #\(viewModel.orderId.prefix(8))")
                         .font(.dmSans(13, weight: .medium))
                         .foregroundStyle(AppColors.muted)
                 }
 
-                // Loading
+                VStack(spacing: 8) {
+                    Text(viewModel.itemLabel)
+                        .font(.dmSans(16, weight: .semibold))
+                        .foregroundStyle(AppColors.charcoal)
+                        .multilineTextAlignment(.center)
+                    Text(viewModel.amountCents.asEuro())
+                        .font(.cormorantDisplay(36, weight: .semibold))
+                        .foregroundStyle(AppColors.primary)
+                }
+
                 if viewModel.isPreparing {
                     ProgressView()
                         .tint(AppColors.primary)
-                        .scaleEffect(1.2)
                 }
 
-                // Status Message
-                if let msg = viewModel.statusMessage {
-                    HStack(spacing: 12) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 20))
-                        Text(msg)
+                if let message = viewModel.statusMessage {
+                    HStack(spacing: 10) {
+                        Image(systemName: "clock.badge.checkmark")
+                            .foregroundStyle(AppColors.info)
+                        Text(message)
                             .font(.dmSans(14, weight: .medium))
                     }
-                    .foregroundStyle(AppColors.success)
-                    .multilineTextAlignment(.center)
-                    .padding(16)
+                    .padding(14)
                     .frame(maxWidth: .infinity)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(AppColors.success.opacity(0.1))
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(AppColors.info.opacity(0.12))
                     )
                     .padding(.horizontal, AppMetrics.horizontalPadding)
                 }
 
                 Spacer()
 
-                // Apple Pay Button
-                VStack(spacing: 16) {
-                    ApplePayButton(
-                        amount: viewModel.amountCents,
-                        onSuccess: { token in
-                            Task {
-                                await viewModel.handleApplePayToken(token)
-                                if viewModel.paymentSucceeded {
-                                    onPaymentCompleted()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                        dismiss()
-                                    }
-                                }
-                            }
-                        },
-                        onError: { error in
-                            viewModel.errorMessage = error.localizedDescription
+                VStack(spacing: 14) {
+                    PrimaryButton(
+                        title: "Payer maintenant",
+                        icon: "creditcard.fill",
+                        isLoading: viewModel.isPreparing,
+                        isDisabled: viewModel.isPreparing || viewModel.paymentSucceeded || viewModel.isAwaitingConfirmation
+                    ) {
+                        Task {
+                            await viewModel.preparePaymentSheet()
                         }
-                    )
-                    .frame(height: 52)
+                    }
                     .padding(.horizontal, AppMetrics.horizontalPadding)
 
-                    Button("Cancel") {
+                    Button("Annuler") {
                         dismiss()
                     }
                     .buttonStyle(SecondaryButtonStyle())
+                    .disabled(viewModel.isPreparing || viewModel.isAwaitingConfirmation)
                     .padding(.horizontal, AppMetrics.horizontalPadding)
                 }
-                .padding(.bottom, 36)
+                .padding(.bottom, 32)
             }
         }
         .navigationBarHidden(true)
+        .overlay {
+            if let paymentSheet = viewModel.paymentSheet {
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .paymentSheet(
+                        isPresented: $viewModel.showPaymentSheet,
+                        paymentSheet: paymentSheet,
+                        onCompletion: viewModel.handlePaymentSheetResult
+                    )
+            }
+        }
+        .onChange(of: viewModel.paymentSucceeded) { _, succeeded in
+            guard succeeded, !hasCompleted else { return }
+            hasCompleted = true
+            onPaymentCompleted()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                dismiss()
+            }
+        }
         .alert(
             "Payment Error",
             isPresented: Binding(

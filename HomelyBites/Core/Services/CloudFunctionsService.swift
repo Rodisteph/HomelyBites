@@ -170,6 +170,16 @@ final class CloudFunctionsService {
         }
     }
 
+    func deleteAccountAndData() async throws {
+        let response = try await call("deleteAccountAndData", data: [:])
+
+        guard let payload = response as? [String: Any],
+              let ok = payload["ok"] as? Bool,
+              ok == true else {
+            throw AppError.invalidResponse
+        }
+    }
+
     func backfillMealLocations(onlyMine: Bool = true, dryRun: Bool = false) async throws -> MealLocationBackfillResult {
         let response = try await call("backfillMealLocations", data: [
             "onlyMine": onlyMine,
@@ -233,6 +243,38 @@ final class CloudFunctionsService {
         #endif
 
         return OrderCheckoutSession(orderId: orderId, clientSecret: clientSecret)
+    }
+
+    func createPaymentIntentWithFee(orderId: String) async throws -> OrderCheckoutSession {
+        let trimmedOrderId = orderId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedOrderId.isEmpty else {
+            throw AppError.invalidInput("orderId manquant pour creer le paiement.")
+        }
+
+        #if DEBUG
+        debugLog("[Functions][createPaymentIntentWithFee] start orderId=\(trimmedOrderId)")
+        #endif
+
+        let response = try await call("createPaymentIntentWithFee", data: [
+            "orderId": trimmedOrderId
+        ])
+
+        guard let payload = response as? [String: Any],
+              let returnedOrderId = payload["orderId"] as? String,
+              let clientSecret = payload["clientSecret"] as? String,
+              !returnedOrderId.isEmpty,
+              !clientSecret.isEmpty else {
+            #if DEBUG
+            debugLog("[Functions][createPaymentIntentWithFee] invalid payload=\(String(describing: response))")
+            #endif
+            throw AppError.invalidResponse
+        }
+
+        #if DEBUG
+        debugLog("[Functions][createPaymentIntentWithFee] result orderId=\(returnedOrderId)")
+        #endif
+
+        return OrderCheckoutSession(orderId: returnedOrderId, clientSecret: clientSecret)
     }
 
     func transitionOrderStatus(orderId: String, to status: OrderStatus) async throws {
@@ -344,7 +386,7 @@ final class CloudFunctionsService {
     }
 
     private func extractMessage(from details: [String: Any]) -> String? {
-        for key in ["message", "error", "description", "reason"] {
+        for key in ["message", "error", "description", "reason", "hint"] {
             if let value = details[key] as? String, !value.isEmpty {
                 return value
             }
@@ -372,7 +414,13 @@ final class CloudFunctionsService {
         if upper == "INTERNAL" || upper == "UNKNOWN" || upper == "UNAUTHENTICATED" {
             return true
         }
-        if upper == String(describing: code).uppercased() {
+        let normalizedUpper = upper
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "_", with: "")
+        if normalizedUpper == String(describing: code).uppercased() {
+            return true
+        }
+        if upper == "NOT FOUND" || upper == "NOT_FOUND" || upper == "FAILED_PRECONDITION" {
             return true
         }
         if upper == "THE OPERATION COULDN'T BE COMPLETED. (INTERNAL.)" {
@@ -398,19 +446,31 @@ final class CloudFunctionsService {
         case ("deleteMeal", .permissionDenied):
             return "Suppression refusee: ce repas ne t'appartient pas."
         case ("deleteMeal", .notFound):
-            return "Ce repas n'existe plus."
+            return "Repas introuvable (deja supprime ou document invalide)."
         case ("deleteMeal", .internal):
             return "Erreur serveur pendant la suppression du repas. Verifie les logs Functions deleteMeal."
         case ("acknowledgeHaccp", .permissionDenied):
             return "Compte host requis pour valider HACCP."
         case ("acknowledgeHaccp", .internal):
             return "Erreur serveur pendant la validation HACCP."
+        case ("backfillMealLocations", .notFound):
+            return "Function backfillMealLocations introuvable en europe-west1. Redeploie les Functions."
         case ("backfillMealLocations", .permissionDenied):
             return "Backfill global reserve a un compte admin."
         case ("backfillMealLocations", .internal):
             return "Erreur serveur pendant le backfill location."
         case ("createOrderAndPaymentIntent", .failedPrecondition):
             return "Ce mode de service n'est pas disponible pour ce repas."
+        case ("createPaymentIntentWithFee", .failedPrecondition):
+            return "Paiement impossible: commande invalide, deja payee, ou compte Stripe host non pret."
+        case ("createPaymentIntentWithFee", .notFound):
+            return "Commande introuvable pour ce paiement."
+        case ("createPaymentIntentWithFee", .internal):
+            return "Erreur serveur pendant la creation du PaymentIntent."
+        case ("deleteAccountAndData", .internal):
+            return "Suppression du compte impossible pour le moment. Reessaie."
+        case ("deleteAccountAndData", .permissionDenied):
+            return "Permission refusee pour supprimer ce compte."
         case (_, .unauthenticated):
             return AppError.missingAuth.localizedDescription
         case (_, .permissionDenied):

@@ -36,6 +36,7 @@ final class MealDetailViewModel: ObservableObject {
 
         isLoading = true
         defer { isLoading = false }
+        confirmationInProgress = false
 
         #if DEBUG
         debugLog("[MealDetail][reserveAndPay] start uid=\(currentUser.uid) mealId=\(meal.id) portions=\(portions) total=\(totalPriceCents)")
@@ -116,7 +117,7 @@ final class MealDetailViewModel: ObservableObject {
 
     func paymentDidComplete() {
         checkoutSession = nil
-        confirmationInProgress = true
+        confirmationInProgress = false
     }
 
     var totalPriceCents: Int {
