@@ -170,6 +170,11 @@ exports.createConnectAccount = onCall(
         const {
           userRef, userData,
         } = await getUserProfile(uid);
+        logger.info('createConnectAccount user profile loaded', {
+          functionName: 'createConnectAccount',
+          uid,
+          userPath: userRef.path,
+        });
         step = 'assert_host_role';
         assertHost(userData);
         const stripe = getStripeClient();
@@ -190,11 +195,13 @@ exports.createConnectAccount = onCall(
 
           step = 'save_existing_profile';
           await userRef.set({
+            role: 'host',
             stripeStatus: existingStatus,
             stripeOnboarded,
             stripeConnectStatus: connectStatus,
             stripeOnboardingUrl: onboardingLink ?.url || null,
             stripeOnboardingExpiresAt: onboardingLink ?.expires_at || null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           }, {
             merge: true,
@@ -233,12 +240,14 @@ exports.createConnectAccount = onCall(
 
         step = 'save_user_profile';
         await userRef.set({
+          role: 'host',
           stripeAccountId: account.id,
           stripeOnboarded: false,
           stripeStatus: 'not_ready',
           stripeConnectStatus: 'not_ready',
           stripeOnboardingUrl: onboardingLink.url,
           stripeOnboardingExpiresAt: onboardingLink.expires_at,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           stripeUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {
           merge: true,
@@ -287,7 +296,29 @@ exports.createConnectAccount = onCall(
           stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
           error: error instanceof Error ? error.message : String(error),
         });
-        throw new HttpsError('internal', 'Unable to create Stripe Connect account.');
+        console.error('[createConnectAccount] failure', {
+          uid,
+          step,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          } : String(error),
+        });
+        throw new HttpsError(
+            'internal',
+            `createConnectAccount failed at step "${step}".`,
+            {
+              message: `Erreur interne Stripe Connect (step: ${step}).`,
+              hint: 'Verifier users/{uid}, role=host et la secret STRIPE_SECRET_KEY.',
+              functionName: 'createConnectAccount',
+              uid,
+              step,
+              stripeRequestId: getStripeRequestId(error),
+              stripeType: error && error.type ? error.type : null,
+              stripeCode: error && error.code ? error.code : null,
+            },
+        );
       }
     },
 );
@@ -639,7 +670,8 @@ exports.createOrderAndPaymentIntent = onCall(
 
       const meal = mealSnapshot.data();
       const priceCents = meal ?.priceCents;
-      const hostId = meal ?.hostId;
+      const hostId = getStringField(meal ?.hostId) ||
+        getStringField(meal ?.ownerId);
       const rawMealServiceMode = getStringField(meal ?.serviceMode);
       let mealServiceMode = SERVICE_MODE.ON_SITE;
       if (rawMealServiceMode) {
@@ -656,7 +688,7 @@ exports.createOrderAndPaymentIntent = onCall(
       if (!Number.isInteger(priceCents) || priceCents <= 0) {
         throw new HttpsError('failed-precondition', 'Meal has an invalid price.');
       }
-      if (!hostId || typeof hostId !== 'string') {
+      if (!hostId) {
         throw new HttpsError('failed-precondition', 'Meal host is missing.');
       }
       if (mealServiceMode !== SERVICE_MODE.BOTH && mealServiceMode !== requestedServiceMode) {
@@ -670,11 +702,19 @@ exports.createOrderAndPaymentIntent = onCall(
         userData: hostData,
       } = await getUserProfile(hostId);
       assertHost(hostData);
-      const hostStripeAccountId = hostData.stripeAccountId;
-      if (!hostStripeAccountId || typeof hostStripeAccountId !== 'string') {
-        throw new HttpsError('failed-precondition', 'Host Stripe account missing.');
+      const hostStripeAccountId = getStringField(hostData.stripeAccountId);
+      if (!hostStripeAccountId) {
+        throw new HttpsError('failed-precondition', 'Host Stripe account missing.', {
+          message: `Host Stripe account missing in users/${hostId}.`,
+          functionName: 'createOrderAndPaymentIntent',
+          hostId,
+          mealId,
+        });
       }
-      if (!hostData.stripeOnboarded) {
+      const hostStripeReady = hostData.stripeOnboarded === true ||
+        hostData.stripeStatus === 'ready' ||
+        hostData.stripeStatus === 'enabled';
+      if (!hostStripeReady) {
         throw new HttpsError('failed-precondition', 'Host Stripe onboarding incomplete.');
       }
 
@@ -719,6 +759,17 @@ exports.createOrderAndPaymentIntent = onCall(
           stripeCode: error && error.code ? error.code : null,
           stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
           error: error instanceof Error ? error.message : String(error),
+        });
+        console.error('[createOrderAndPaymentIntent] payment_intent_failure', {
+          orderId,
+          mealId,
+          clientId: uid,
+          hostId,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          } : String(error),
         });
         throw new HttpsError('internal', 'Unable to create payment intent.');
       }
@@ -798,6 +849,207 @@ exports.createOrderAndPaymentIntent = onCall(
         orderId,
         clientSecret: paymentIntent.client_secret,
       };
+    },
+);
+
+exports.createPaymentIntentWithFee = onCall(
+    {
+      region: REGION,
+      secrets: [STRIPE_SECRET_KEY],
+    },
+    async (request) => {
+      const uid = assertAuthenticated(request);
+      const orderId = getStringField(request.data ?.orderId);
+      logger.info('createPaymentIntentWithFee called', {
+        functionName: 'createPaymentIntentWithFee',
+        uid,
+        orderId,
+      });
+
+      if (!orderId) {
+        throw new HttpsError('invalid-argument', 'orderId is required.');
+      }
+
+      let step = 'load_order';
+      try {
+        const orderRef = db.collection('orders').doc(orderId);
+        const orderSnapshot = await orderRef.get();
+        if (!orderSnapshot.exists) {
+          throw new HttpsError('not-found', 'Order not found.');
+        }
+
+        const order = orderSnapshot.data() || {};
+        if (order.clientId !== uid) {
+          throw new HttpsError('permission-denied', 'Not your order.');
+        }
+
+        if (order.paymentStatus === PAYMENT_STATUS.PAID) {
+          throw new HttpsError('failed-precondition', 'Order already paid.');
+        }
+        if (order.paymentStatus && order.paymentStatus !== PAYMENT_STATUS.REQUIRES_PAYMENT) {
+          throw new HttpsError('failed-precondition', 'Order is not payable.');
+        }
+
+        const amount = Number.isInteger(order.amountCents) ? order.amountCents : order.amount;
+        if (!Number.isInteger(amount) || amount <= 0) {
+          throw new HttpsError('failed-precondition', 'Invalid order amount.');
+        }
+
+        const mealId = getStringField(order.mealId);
+        const hostId = getStringField(order.hostId);
+        if (!hostId) {
+          throw new HttpsError('failed-precondition', 'Order host missing.');
+        }
+
+        step = 'load_host_profile';
+        const {
+          userData: hostData,
+        } = await getUserProfile(hostId);
+        assertHost(hostData);
+        const hostStripeAccountId = getStringField(order.hostStripeAccountId) ||
+          getStringField(hostData.stripeAccountId);
+        if (!hostStripeAccountId) {
+          throw new HttpsError('failed-precondition', 'Host Stripe account missing.', {
+            message: `Host Stripe account missing in users/${hostId}.`,
+            functionName: 'createPaymentIntentWithFee',
+            hostId,
+            orderId,
+          });
+        }
+        const hostStripeReady = hostData.stripeOnboarded === true ||
+          hostData.stripeStatus === 'ready' ||
+          hostData.stripeStatus === 'enabled';
+        if (!hostStripeReady) {
+          throw new HttpsError('failed-precondition', 'Host Stripe onboarding incomplete.');
+        }
+
+        const stripe = getStripeClient();
+        const applicationFeeAmount = Math.round(amount * (PLATFORM_FEE_BPS / 10000));
+        const existingPaymentIntentId = getStringField(order.paymentIntentId);
+        let paymentIntent = null;
+
+        if (existingPaymentIntentId) {
+          step = 'retrieve_existing_payment_intent';
+          try {
+            paymentIntent = await stripe.paymentIntents.retrieve(existingPaymentIntentId);
+            if (paymentIntent.status === 'succeeded') {
+              throw new HttpsError('failed-precondition', 'Order already paid.');
+            }
+            if (paymentIntent.status === 'canceled') {
+              paymentIntent = null;
+            }
+          } catch (error) {
+            if (error instanceof HttpsError) {
+              throw error;
+            }
+            const stripeCode = error && error.code ? error.code : null;
+            if (stripeCode === 'resource_missing') {
+              logger.warn('Existing paymentIntent missing, recreating', {
+                functionName: 'createPaymentIntentWithFee',
+                orderId,
+                paymentIntentId: existingPaymentIntentId,
+              });
+              paymentIntent = null;
+            } else {
+              throw error;
+            }
+          }
+        }
+
+        if (!paymentIntent) {
+          step = 'create_payment_intent';
+          paymentIntent = await stripe.paymentIntents.create({
+            amount,
+            currency: 'eur',
+            automatic_payment_methods: {
+              enabled: true,
+            },
+            application_fee_amount: applicationFeeAmount,
+            transfer_data: {
+              destination: hostStripeAccountId,
+            },
+            metadata: {
+              orderId,
+              mealId,
+              clientId: uid,
+              hostId,
+            },
+          }, {
+            idempotencyKey: `create_payment_intent_${orderId}`,
+          });
+        }
+
+        if (!paymentIntent ?.id || !paymentIntent ?.client_secret) {
+          throw new HttpsError('internal', 'PaymentIntent response invalid.');
+        }
+
+        step = 'persist_order_and_mapping';
+        await Promise.all([
+          orderRef.set({
+            paymentIntentId: paymentIntent.id,
+            hostStripeAccountId,
+            amountCents: amount,
+            currency: 'eur',
+            paymentStatus: PAYMENT_STATUS.REQUIRES_PAYMENT,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {
+            merge: true,
+          }),
+          db.collection(PAYMENT_INTENT_ORDERS_COLLECTION).doc(paymentIntent.id).set({
+            orderId,
+            paymentIntentId: paymentIntent.id,
+            clientId: uid,
+            hostId,
+            mealId,
+            source: 'createPaymentIntentWithFee',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {
+            merge: true,
+          }),
+        ]);
+
+        return {
+          orderId,
+          paymentIntentId: paymentIntent.id,
+          clientSecret: paymentIntent.client_secret,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        logger.error('createPaymentIntentWithFee failed', {
+          functionName: 'createPaymentIntentWithFee',
+          uid,
+          orderId,
+          step,
+          stripeRequestId: getStripeRequestId(error),
+          stripeType: error && error.type ? error.type : null,
+          stripeCode: error && error.code ? error.code : null,
+          stripeDeclineCode: error && error.decline_code ? error.decline_code : null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        console.error('[createPaymentIntentWithFee] failure', {
+          uid,
+          orderId,
+          step,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          } : String(error),
+        });
+        throw new HttpsError(
+            'internal',
+            `createPaymentIntentWithFee failed at step "${step}".`,
+            {
+              message: `Erreur interne creation PaymentIntent (step: ${step}).`,
+              functionName: 'createPaymentIntentWithFee',
+              orderId,
+              step,
+            },
+        );
+      }
     },
 );
 
@@ -893,6 +1145,136 @@ exports.transitionOrderStatus = onCall(
         orderId,
         status: nextStatus,
       };
+    },
+);
+
+exports.deleteAccountAndData = onCall(
+    {
+      region: REGION,
+    },
+    async (request) => {
+      const uid = assertAuthenticated(request);
+      logger.info('deleteAccountAndData called', {
+        functionName: 'deleteAccountAndData',
+        uid,
+      });
+
+      let step = 'delete_orders_client';
+      let deletedOrdersClient = 0;
+      let deletedOrdersHost = 0;
+      let deletedMeals = 0;
+      let deletedPaymentMappingsClient = 0;
+      let deletedPaymentMappingsHost = 0;
+
+      const deleteByQuery = async (queryBuilder) => {
+        let deleted = 0;
+        const batchSize = 200;
+        let hasMore = true;
+        while (hasMore) {
+          const snapshot = await queryBuilder.limit(batchSize).get();
+          if (snapshot.empty) {
+            break;
+          }
+
+          const batch = db.batch();
+          snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+          deleted += snapshot.size;
+
+          hasMore = snapshot.size === batchSize;
+        }
+        return deleted;
+      };
+
+      try {
+        deletedOrdersClient = await deleteByQuery(
+            db.collection('orders').where('clientId', '==', uid),
+        );
+
+        step = 'delete_orders_host';
+        deletedOrdersHost = await deleteByQuery(
+            db.collection('orders').where('hostId', '==', uid),
+        );
+
+        step = 'delete_meals_host';
+        deletedMeals = await deleteByQuery(
+            db.collection('meals').where('hostId', '==', uid),
+        );
+
+        step = 'delete_payment_mappings_client';
+        deletedPaymentMappingsClient = await deleteByQuery(
+            db.collection(PAYMENT_INTENT_ORDERS_COLLECTION).where('clientId', '==', uid),
+        );
+
+        step = 'delete_payment_mappings_host';
+        deletedPaymentMappingsHost = await deleteByQuery(
+            db.collection(PAYMENT_INTENT_ORDERS_COLLECTION).where('hostId', '==', uid),
+        );
+
+        step = 'delete_user_profile';
+        await db.collection('users').doc(uid).set({
+          accountDeletionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+        await db.collection('users').doc(uid).delete();
+
+        step = 'delete_auth_user';
+        try {
+          await admin.auth().deleteUser(uid);
+        } catch (authError) {
+          const authCode = authError && authError.code ? authError.code : null;
+          if (authCode !== 'auth/user-not-found') {
+            throw authError;
+          }
+        }
+
+        logger.info('deleteAccountAndData success', {
+          functionName: 'deleteAccountAndData',
+          uid,
+          deletedOrdersClient,
+          deletedOrdersHost,
+          deletedMeals,
+          deletedPaymentMappingsClient,
+          deletedPaymentMappingsHost,
+        });
+
+        return {
+          ok: true,
+          deletedOrdersClient,
+          deletedOrdersHost,
+          deletedMeals,
+          deletedPaymentMappingsClient,
+          deletedPaymentMappingsHost,
+        };
+      } catch (error) {
+        logger.error('deleteAccountAndData failed', {
+          functionName: 'deleteAccountAndData',
+          uid,
+          step,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        console.error('[deleteAccountAndData] failure', {
+          uid,
+          step,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          } : String(error),
+        });
+        throw new HttpsError(
+            'internal',
+            `deleteAccountAndData failed at step "${step}".`,
+            {
+              message: `Suppression de compte echouee (step: ${step}).`,
+              functionName: 'deleteAccountAndData',
+              uid,
+              step,
+            },
+        );
+      }
     },
 );
 
@@ -1077,7 +1459,12 @@ exports.deleteMeal = onCall(
         }
 
         if (!snapshot.exists) {
-          throw new HttpsError('not-found', 'Meal not found.');
+          throw new HttpsError('not-found', 'Meal not found.', {
+            message: `Aucun document meals/${mealId} trouve.`,
+            functionName: 'deleteMeal',
+            mealId,
+            step,
+          });
         }
 
         const meal = snapshot.data() || {};
@@ -1148,7 +1535,18 @@ exports.deleteMeal = onCall(
           step,
           error: error instanceof Error ? error.message : String(error),
         });
-        throw new HttpsError('internal', 'Unable to delete meal.');
+        throw new HttpsError(
+            'internal',
+            `deleteMeal failed at step "${step}".`,
+            {
+              message: `Erreur interne suppression meal (step: ${step}).`,
+              hint: 'Verifier ownerId/hostId, permissions et existence du document meals/{mealId}.',
+              functionName: 'deleteMeal',
+              uid,
+              mealId,
+              step,
+            },
+        );
       }
     },
 );
@@ -1176,60 +1574,100 @@ exports.backfillMealLocations = onCall(
         dryRun,
       });
 
-      let query = db.collection('meals');
-      if (onlyMine) {
-        query = query.where('hostId', '==', uid);
-      }
-
-      const mealsSnapshot = await query.limit(500).get();
-      let processedCount = 0;
-      let updatedCount = 0;
-
-      const batch = db.batch();
-      mealsSnapshot.docs.forEach((doc) => {
-        processedCount += 1;
-        const meal = doc.data() || {};
-        const hasLocation = Boolean(meal.location) || Boolean(meal.geoPoint);
-
-        if (hasLocation) {
-          return;
+      let step = 'query_meals';
+      try {
+        let query = db.collection('meals');
+        if (onlyMine) {
+          query = query.where('hostId', '==', uid);
         }
 
-        updatedCount += 1;
-        if (!dryRun) {
-          batch.set(doc.ref, {
-            location: fallbackLocation,
-            locationName: getStringField(meal.locationName) ||
-              getStringField(meal.city) ||
-              fallbackCity,
-            city: getStringField(meal.city) || fallbackCity,
-            locationBackfilledAt: admin.firestore.FieldValue.serverTimestamp(),
-            locationBackfilledBy: uid,
-          }, {
-            merge: true,
-          });
+        const mealsSnapshot = await query.limit(500).get();
+        let processedCount = 0;
+        let updatedCount = 0;
+
+        const batch = db.batch();
+        mealsSnapshot.docs.forEach((doc) => {
+          processedCount += 1;
+          const meal = doc.data() || {};
+          const hasLocation = Boolean(meal.location) || Boolean(meal.geoPoint);
+
+          if (hasLocation) {
+            return;
+          }
+
+          updatedCount += 1;
+          if (!dryRun) {
+            batch.set(doc.ref, {
+              location: fallbackLocation,
+              locationName: getStringField(meal.locationName) ||
+                getStringField(meal.city) ||
+                fallbackCity,
+              city: getStringField(meal.city) || fallbackCity,
+              locationBackfilledAt: admin.firestore.FieldValue.serverTimestamp(),
+              locationBackfilledBy: uid,
+            }, {
+              merge: true,
+            });
+          }
+        });
+
+        step = 'commit_batch';
+        if (!dryRun && updatedCount > 0) {
+          await batch.commit();
         }
-      });
 
-      if (!dryRun && updatedCount > 0) {
-        await batch.commit();
+        logger.info('backfillMealLocations completed', {
+          functionName: 'backfillMealLocations',
+          uid,
+          onlyMine,
+          dryRun,
+          processedCount,
+          updatedCount,
+        });
+
+        return {
+          ok: true,
+          processedCount,
+          updatedCount,
+          dryRun,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+        console.error('[backfillMealLocations] failure', {
+          uid,
+          onlyMine,
+          dryRun,
+          step,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          } : String(error),
+        });
+        logger.error('backfillMealLocations failed', {
+          functionName: 'backfillMealLocations',
+          uid,
+          onlyMine,
+          dryRun,
+          step,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new HttpsError(
+            'internal',
+            `backfillMealLocations failed at step "${step}".`,
+            {
+              message: `Erreur interne backfill locations (step: ${step}).`,
+              hint: 'Verifier existence de la collection meals et permissions service account.',
+              functionName: 'backfillMealLocations',
+              uid,
+              onlyMine,
+              dryRun,
+              step,
+            },
+        );
       }
-
-      logger.info('backfillMealLocations completed', {
-        functionName: 'backfillMealLocations',
-        uid,
-        onlyMine,
-        dryRun,
-        processedCount,
-        updatedCount,
-      });
-
-      return {
-        ok: true,
-        processedCount,
-        updatedCount,
-        dryRun,
-      };
     },
 );
 
@@ -1487,7 +1925,9 @@ applyStripePaymentEventToOrder({
 
       tx.set(orderRef, {
         paymentStatus: PAYMENT_STATUS.PAID,
+        status: ORDER_STATUS.CONFIRMED,
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {
         merge: true,
       });
@@ -1743,10 +2183,10 @@ exports.confirmApplePayPayment = onCall(
           throw new HttpsError('failed-precondition', 'Payment not confirmed.');
         }
 
-        step = 'update_order';
+        step = 'wait_webhook_confirmation';
         await orderRef.set({
-          paymentStatus: PAYMENT_STATUS.PAID,
-          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+          paymentConfirmationStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+          paymentStatus: PAYMENT_STATUS.REQUIRES_PAYMENT,
         }, {
           merge: true,
         });
@@ -1762,6 +2202,7 @@ exports.confirmApplePayPayment = onCall(
           ok: true,
           orderId,
           paymentIntentId,
+          confirmationPending: true,
         };
       } catch (error) {
         if (error instanceof HttpsError) {
