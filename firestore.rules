@@ -33,6 +33,18 @@ service cloud.firestore {
       return request.resource.data.paymentStatus == resource.data.paymentStatus;
     }
 
+    function isValidOrderCreate() {
+      return request.resource.data.clientId == request.auth.uid
+        && request.resource.data.hostId is string
+        && request.resource.data.hostId.size() > 0
+        && request.resource.data.mealId is string
+        && request.resource.data.mealId.size() > 0
+        && request.resource.data.amountCents is int
+        && request.resource.data.amountCents > 0
+        && request.resource.data.status == "pending"
+        && request.resource.data.paymentStatus == "requires_payment";
+    }
+
     function isMealOwner() {
       return isSignedIn()
         && (
@@ -76,7 +88,8 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if isOrderParticipant();
-      allow create, update, delete: if false;
+      allow create: if isSignedIn() && isValidOrderCreate();
+      allow update, delete: if false;
     }
   }
 }
