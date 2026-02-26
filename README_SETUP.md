@@ -69,7 +69,9 @@ firebase deploy --only functions
 Functions deployed:
 - `createConnectAccount`
 - `createOnboardingLink`
+- `createOrderAndPaymentIntent`
 - `createPaymentIntentWithFee`
+- `deleteAccountAndData`
 - `stripeWebhook`
 
 ## 5) Stripe webhook setup
@@ -80,6 +82,7 @@ Functions deployed:
 3. Events:
    - `payment_intent.succeeded`
    - `payment_intent.payment_failed`
+   - `charge.succeeded`
    - `account.updated`
 4. Copy signing secret (`whsec_...`) and set it:
 
@@ -101,7 +104,7 @@ These URLs are used by `createOnboardingLink` in Cloud Functions.
 3. Host creates meal (or `Seed 2 meals de test`).
 4. Create client account.
 5. Client opens meal detail -> `Reserver & payer`.
-6. PaymentSheet completes payment.
+6. PaymentSheet completes payment, puis l'app attend la confirmation webhook.
 7. Check `orders/{orderId}` updated by webhook:
    - `paymentStatus = paid`
    - `status = confirmed`
