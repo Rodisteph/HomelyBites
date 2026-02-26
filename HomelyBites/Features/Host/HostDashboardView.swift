@@ -18,21 +18,23 @@ struct HostDashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: HBMetrics.Spacing.l) {
                 if let user = session.appUser {
                     welcomeHeader(for: user)
-
+                    statsStrip
+                    if pendingOrdersCount > 0 {
+                        newOrdersAlert
+                    }
                     stripeStatusCard(for: user)
-
                     mealsSection(for: user)
-
                     ordersSection
                 }
             }
-            .padding(.vertical, 20)
+            .padding(.horizontal, HBMetrics.horizontalPadding)
+            .padding(.vertical, HBMetrics.Spacing.m)
         }
-        .background(AppColors.cream)
-        .navigationTitle("Host Dashboard")
+        .hbBackground()
+        .hbNavTitle("Host Dashboard", displayMode: .inline)
         .task {
             guard let hostId = session.appUser?.id else { return }
             viewModel.startListening(hostId: hostId)
@@ -88,7 +90,7 @@ struct HostDashboardView: View {
                 set: { if !$0 { viewModel.pendingDeletionMeal = nil } }
             ),
             presenting: viewModel.pendingDeletionMeal
-        ) { meal in
+        ) { _ in
             Button("Annuler", role: .cancel) {}
             Button("Supprimer", role: .destructive) {
                 guard let hostId = session.appUser?.id else { return }
@@ -102,251 +104,256 @@ struct HostDashboardView: View {
         }
     }
 
-    // MARK: - View Builders
     @ViewBuilder
     private func welcomeHeader(for user: AppUser) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: HBMetrics.Spacing.xs) {
             Text("Bienvenue, \(user.fullName)")
-                .font(.cormorantDisplay(28, weight: .semibold))
-                .foregroundStyle(AppColors.charcoal)
-            Text("Dashboard Host")
-                .font(.bodyLarge)
-                .foregroundStyle(AppColors.textSecondary)
+                .font(HBTypography.display(size: 34))
+                .foregroundStyle(HBColors.textPrimary)
+            Text("Pilotez vos repas, commandes et paiements")
+                .font(HBTypography.body(size: 15))
+                .foregroundStyle(HBColors.textSecondary)
         }
-        .padding(.horizontal, 20)
+    }
+
+    private var statsStrip: some View {
+        HStack(spacing: HBMetrics.Spacing.s) {
+            statCard(title: "Repas", value: "\(viewModel.hostMeals.count)", tint: HBColors.sage)
+            statCard(title: "Commandes", value: "\(viewModel.receivedOrders.count)", tint: HBColors.terracotta)
+            statCard(title: "CA payé", value: paidRevenueCents.asEuro(), tint: HBColors.terracottaDark)
+        }
+    }
+
+    private var newOrdersAlert: some View {
+        HStack(alignment: .center, spacing: HBMetrics.Spacing.s) {
+            Image(systemName: "bell.badge.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Nouvelles commandes")
+                    .font(HBTypography.body(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("\(pendingOrdersCount) commande(s) en attente de validation")
+                    .font(HBTypography.label(size: 12))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+
+            Spacer()
+        }
+        .padding(HBMetrics.cardPadding)
+        .background(
+            LinearGradient(
+                colors: [HBColors.terracottaDark, HBColors.terracotta],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: HBMetrics.Radius.card, style: .continuous))
+        .hbShadow(.strong)
     }
 
     @ViewBuilder
     private func stripeStatusCard(for user: AppUser) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        CardContainer {
             Text("Paiements")
-                .font(.headlineSmall)
-                .foregroundStyle(AppColors.charcoal)
+                .hbTitle()
 
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Stripe status")
-                        .font(.bodyMedium)
-                        .foregroundStyle(AppColors.textSecondary)
-                    Text(user.isStripeReady ? "Activé" : "Non activé")
-                        .font(.dmSans(16, weight: .semibold))
-                        .foregroundStyle(user.isStripeReady ? AppColors.success : AppColors.warning)
+                HStack {
+                    VStack(alignment: .leading, spacing: HBMetrics.Spacing.xs) {
+                        Text("Stripe status")
+                            .font(HBTypography.label())
+                            .foregroundStyle(HBColors.textSecondary)
+                        Text(user.isStripeReady ? "Activé" : "Non activé")
+                            .font(HBTypography.body(size: 16, weight: .semibold))
+                            .foregroundStyle(user.isStripeReady ? HBColors.success : HBColors.warning)
+
+                        Text("Onboarding: \(user.stripeOnboarded == true ? "Terminé" : "En attente")")
+                            .font(HBTypography.label(size: 12))
+                            .foregroundStyle(HBColors.textSecondary)
+
+                        Text("Statut: \(user.stripeStatusDisplay)")
+                            .font(HBTypography.label(size: 12))
+                            .foregroundStyle(HBColors.textSecondary)
+                    }
+                    Spacer()
+                    Badge(label: user.isStripeReady ? "Prêt" : "Action requise", kind: user.isStripeReady ? .success : .warning)
                 }
-                Spacer()
-                StatusBadge(type: user.isStripeReady ? .completed : .pending)
-            }
 
-            Button {
+            PrimaryButton(
+                title: viewModel.isActivatingPayments ? "Ouverture Stripe..." : "Activer paiements",
+                icon: "creditcard.fill",
+                isLoading: viewModel.isActivatingPayments,
+                isDisabled: viewModel.isActivatingPayments
+            ) {
                 Task {
                     await viewModel.activatePayments()
                 }
-            } label: {
-                if viewModel.isActivatingPayments {
-                    HStack {
-                        ProgressView()
-                            .tint(.white)
-                        Text("Ouverture Stripe...")
-                    }
-                } else {
-                    Text("Activer paiements")
-                }
             }
-            .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isActivatingPayments))
 
-            Button {
+            SecondaryButton(title: "Rafraîchir profil Stripe", icon: "arrow.clockwise") {
                 Task {
                     await viewModel.refreshStripeStatus()
                     await session.refreshUserProfile()
                 }
-            } label: {
-                Text("Rafraîchir profil Stripe")
             }
-            .buttonStyle(SecondaryButtonStyle())
         }
-        .padding(16)
-        .appCard()
-        .padding(.horizontal, 20)
     }
 
     @ViewBuilder
     private func mealsSection(for user: AppUser) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: HBMetrics.Spacing.m) {
             HStack {
                 Text("Mes plats")
-                    .font(.headlineMedium)
-                    .foregroundStyle(AppColors.charcoal)
+                    .font(HBTypography.title(size: 28))
+                    .foregroundStyle(HBColors.textPrimary)
                 Spacer()
                 Button {
                     viewModel.showingCreateMeal = true
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(AppColors.terracotta)
+                        .font(.system(size: 30))
+                        .foregroundStyle(HBColors.terracotta)
                 }
             }
 
             if let successMessage = viewModel.successMessage {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text(successMessage)
-                        .font(.bodyMedium)
+                CardContainer {
+                    HStack(spacing: HBMetrics.Spacing.s) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(HBColors.success)
+                        Text(successMessage)
+                            .font(HBTypography.body(size: 14))
+                            .foregroundStyle(HBColors.success)
+                    }
                 }
-                .foregroundStyle(AppColors.success)
+            }
+
+            SecondaryButton(
+                title: viewModel.isBackfillingLocations ? "Mise à jour des localisations..." : "Ajouter localisation aux repas existants",
+                icon: "location.fill",
+                isDisabled: viewModel.isBackfillingLocations
+            ) {
+                Task {
+                    await viewModel.backfillMealLocationsForHost()
+                }
             }
 
             if viewModel.hostMeals.isEmpty {
-                VStack(spacing: 12) {
+                CardContainer {
                     Text("Aucun plat publié pour le moment.")
-                        .font(.bodyMedium)
-                        .foregroundStyle(AppColors.textSecondary)
+                        .font(HBTypography.body(size: 15))
+                        .foregroundStyle(HBColors.textSecondary)
 
-                    Button("Seed 2 meals de test") {
+                    SecondaryButton(title: "Seed 2 meals de test", icon: "fork.knife") {
                         Task {
                             await viewModel.seedMeals(host: user)
                         }
                     }
-                    .font(.labelLarge)
-                    .foregroundStyle(AppColors.terracotta)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(20)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(AppColors.creamDark)
-                )
             } else {
-                ForEach(viewModel.hostMeals) { meal in
-                    MealCardView(meal: meal)
-                }
-                .onDelete { offsets in
-                    viewModel.requestMealDeletion(at: offsets)
+                LazyVStack(spacing: HBMetrics.Spacing.m) {
+                    ForEach(Array(viewModel.hostMeals.enumerated()), id: \.element.id) { index, meal in
+                        CardContainer {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: HBMetrics.Spacing.xs) {
+                                    Text(meal.title)
+                                        .font(HBTypography.title(size: 22))
+                                        .foregroundStyle(HBColors.textPrimary)
+                                    Text("Portions disponibles: \(meal.availablePortions)")
+                                        .font(HBTypography.label())
+                                        .foregroundStyle(HBColors.textSecondary)
+                                }
+
+                                Spacer()
+
+                                VStack(alignment: .trailing, spacing: HBMetrics.Spacing.s) {
+                                    Text(meal.priceCents.asEuro())
+                                        .font(HBTypography.body(size: 18, weight: .bold))
+                                        .foregroundStyle(HBColors.terracotta)
+
+                                    Button(role: .destructive) {
+                                        viewModel.requestMealDeletion(at: IndexSet(integer: index))
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .font(.system(size: 14, weight: .semibold))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-        .padding(.horizontal, 20)
     }
 
     @ViewBuilder
     private var ordersSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: HBMetrics.Spacing.m) {
             Text("Commandes reçues")
-                .font(.headlineMedium)
-                .foregroundStyle(AppColors.charcoal)
+                .font(HBTypography.title(size: 28))
+                .foregroundStyle(HBColors.textPrimary)
 
             if viewModel.receivedOrders.isEmpty {
-                Text("Aucune commande pour le moment.")
-                    .font(.bodyMedium)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(AppColors.creamDark)
-                    )
+                CardContainer {
+                    Text("Aucune commande pour le moment.")
+                        .font(HBTypography.body(size: 15))
+                        .foregroundStyle(HBColors.textSecondary)
+                }
             } else {
-                ForEach(viewModel.receivedOrders) { order in
-                    HostOrderRow(
-                        order: order,
-                        onConfirm: {
-                            guard let orderId = order.id else { return }
-                            Task { await viewModel.updateOrderStatus(orderId: orderId, status: .confirmed) }
-                        },
-                        onReject: {
-                            guard let orderId = order.id else { return }
-                            Task { await viewModel.updateOrderStatus(orderId: orderId, status: .rejected) }
-                        }
-                    )
-                }
-            }
-        }
-        .padding(.horizontal, 20)
-    }
-}
-
-private struct MealCardView: View {
-    let meal: Meal
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(meal.title)
-                        .font(.cormorantDisplay(20, weight: .semibold))
-                        .foregroundStyle(AppColors.charcoal)
-                    Text("Portions disponibles: \(meal.availablePortions)")
-                        .font(.labelMedium)
-                        .foregroundStyle(AppColors.textSecondary)
-                }
-                Spacer()
-                Text(meal.priceCents.asEuro())
-                    .font(.dmSans(18, weight: .bold))
-                    .foregroundStyle(AppColors.terracotta)
-            }
-        }
-        .padding(16)
-        .appCard()
-    }
-}
-
-private struct HostOrderRow: View {
-    let order: Order
-    let onConfirm: () -> Void
-    let onReject: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Commande #\(order.id?.prefix(8) ?? "--------")")
-                        .font(.cormorantDisplay(18, weight: .semibold))
-                        .foregroundStyle(AppColors.charcoal)
-                    Text("Portions: \(order.portions)")
-                        .font(.labelMedium)
-                        .foregroundStyle(AppColors.textSecondary)
-                }
-                Spacer()
-                Text(order.amountCents.asEuro())
-                    .font(.dmSans(20, weight: .bold))
-                    .foregroundStyle(AppColors.terracotta)
-            }
-
-            HStack {
-                StatusBadge(type: badgeType(for: order.paymentStatus))
-                if order.status != .pending {
-                    Text(order.status.displayTitle)
-                        .font(.labelMedium)
-                        .foregroundStyle(AppColors.textSecondary)
-                }
-            }
-
-            if order.status == .pending {
-                HStack(spacing: 12) {
-                    Button {
-                        onConfirm()
-                    } label: {
-                        Text("Confirmer")
+                LazyVStack(spacing: HBMetrics.Spacing.m) {
+                    ForEach(viewModel.receivedOrders) { order in
+                        OrderRow(
+                            order: order,
+                            onConfirm: {
+                                guard let orderId = order.id else { return }
+                                Task {
+                                    await viewModel.updateOrderStatus(orderId: orderId, status: .confirmed)
+                                }
+                            },
+                            onReject: {
+                                guard let orderId = order.id else { return }
+                                Task {
+                                    await viewModel.updateOrderStatus(orderId: orderId, status: .rejected)
+                                }
+                            }
+                        )
                     }
-                    .buttonStyle(PrimaryButtonStyle())
-
-                    Button {
-                        onReject()
-                    } label: {
-                        Text("Rejeter")
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
                 }
             }
         }
-        .padding(16)
-        .appCard()
     }
 
-    private func badgeType(for paymentStatus: PaymentStatus) -> StatusBadge.BadgeType {
-        switch paymentStatus {
-        case .requires_payment: return .pending
-        case .paid: return .completed
-        case .failed: return .cancelled
-        case .refunded: return .cancelled
+    private func statCard(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: HBMetrics.Spacing.xs) {
+            Text(title)
+                .font(HBTypography.label(size: 12))
+                .foregroundStyle(HBColors.textSecondary)
+            Text(value)
+                .font(HBTypography.title(size: 20))
+                .foregroundStyle(HBColors.textPrimary)
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(tint.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(tint.opacity(0.24), lineWidth: 1)
+        )
+    }
+
+    private var pendingOrdersCount: Int {
+        viewModel.receivedOrders.filter { $0.status == .pending }.count
+    }
+
+    private var paidRevenueCents: Int {
+        viewModel.receivedOrders
+            .filter { $0.paymentStatus == .paid }
+            .reduce(0) { partialResult, order in
+                partialResult + order.amountCents
+            }
     }
 }
