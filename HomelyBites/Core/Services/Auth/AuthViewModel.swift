@@ -12,6 +12,7 @@ final class AuthViewModel: ObservableObject {
     @Published var selectedRole: UserRole = .client
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var infoMessage: String?
 
     enum Mode: String, CaseIterable, Identifiable {
         case signIn
@@ -41,6 +42,7 @@ final class AuthViewModel: ObservableObject {
     }
 
     func submit() async {
+        infoMessage = nil
         guard !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             errorMessage = "Email requis."
             return
@@ -80,11 +82,32 @@ final class AuthViewModel: ObservableObject {
     }
 
     func signInWithGoogle(presenting: UIViewController) async {
+        infoMessage = nil
         isLoading = true
         defer { isLoading = false }
 
         do {
             _ = try await authService.signInWithGoogle(presenting: presenting)
+        } catch {
+            logSubmitError(error)
+            errorMessage = userFacingMessage(for: error)
+        }
+    }
+
+    func sendPasswordReset() async {
+        infoMessage = nil
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedEmail.isEmpty else {
+            errorMessage = "Saisis ton email pour reinitialiser le mot de passe."
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            try await authService.sendPasswordReset(email: normalizedEmail)
+            infoMessage = "Email de reinitialisation envoye. Verifie ta boite mail."
         } catch {
             logSubmitError(error)
             errorMessage = userFacingMessage(for: error)

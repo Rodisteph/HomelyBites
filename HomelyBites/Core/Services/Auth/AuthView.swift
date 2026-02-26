@@ -11,93 +11,103 @@ struct AuthView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
-                    VStack(spacing: 10) {
-                        BrandLogoView(size: 86)
-                        Text("HomelyBites")
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(AppColors.textPrimary)
-                        Text("Repas faits maison, en toute confiance")
-                            .font(.subheadline)
-                            .foregroundStyle(AppColors.textSecondary)
-                    }
-                    .padding(.top, 16)
+                VStack(spacing: 0) {
+                    onboardingHero
 
-                    Picker("Mode", selection: $viewModel.mode) {
-                        ForEach(AuthViewModel.Mode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    if viewModel.mode == .signUp {
-                        TextField("Nom complet", text: $viewModel.fullName)
-                            .textInputAutocapitalization(.words)
-                            .appTextFieldStyle()
-
-                        Picker("Role", selection: $viewModel.selectedRole) {
-                            ForEach(UserRole.allCases) { role in
-                                Text(role.displayTitle).tag(role)
+                    VStack(spacing: HBMetrics.Spacing.m) {
+                        Picker("Mode", selection: $viewModel.mode) {
+                            ForEach(AuthViewModel.Mode.allCases) { mode in
+                                Text(mode.title).tag(mode)
                             }
                         }
                         .pickerStyle(.segmented)
-                        .padding(6)
-                        .background(
-                            RoundedRectangle(cornerRadius: AppMetrics.controlCornerRadius, style: .continuous)
-                                .fill(AppColors.surface)
-                        )
+
+                        if viewModel.mode == .signUp {
+                            TextField("Nom complet", text: $viewModel.fullName)
+                                .textInputAutocapitalization(.words)
+                                .hbInputStyle()
+
+                            Picker("Role", selection: $viewModel.selectedRole) {
+                                ForEach(UserRole.allCases) { role in
+                                    Text(role.displayTitle).tag(role)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
+                                    .fill(HBColors.warmWhite)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
+                                    .stroke(HBColors.border, lineWidth: 1)
+                            )
+                        }
+
+                        TextField("Email", text: $viewModel.email)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .hbInputStyle()
+
+                        SecureField("Mot de passe", text: $viewModel.password)
+                            .hbInputStyle()
+
+                        if viewModel.mode == .signIn {
+                            HStack {
+                                Spacer()
+                                Button("Mot de passe oublie ?") {
+                                    Task {
+                                        await viewModel.sendPasswordReset()
+                                    }
+                                }
+                                .font(HBTypography.label(size: 13, weight: .semibold))
+                                .foregroundStyle(HBColors.terracotta)
+                                .disabled(viewModel.isLoading)
+                            }
+                        }
+
+                        PrimaryButton(
+                            title: viewModel.mode.actionTitle,
+                            isLoading: viewModel.isLoading,
+                            isDisabled: viewModel.isLoading
+                        ) {
+                            Task {
+                                await viewModel.submit()
+                            }
+                        }
+
+                        SecondaryButton(title: "Continuer avec Google", icon: "globe") {
+                            Task {
+                                await signInWithGoogleTapped()
+                            }
+                        }
+                        .disabled(viewModel.isLoading)
+
+                        if let infoMessage = viewModel.infoMessage {
+                            HStack(spacing: HBMetrics.Spacing.xs) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(HBColors.success)
+                                Text(infoMessage)
+                                    .font(HBTypography.label(size: 12))
+                                    .foregroundStyle(HBColors.success)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
-
-                    TextField("Email", text: $viewModel.email)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
-                        .appTextFieldStyle()
-
-                    SecureField("Mot de passe", text: $viewModel.password)
-                        .appTextFieldStyle()
-
-                    Button {
-                        Task {
-                            await viewModel.submit()
-                        }
-                    } label: {
-                        if viewModel.isLoading {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Text(viewModel.mode.actionTitle)
-                        }
-                    }
-                    .buttonStyle(PrimaryButtonStyle(isLoading: viewModel.isLoading))
-                    .disabled(viewModel.isLoading)
-
-                    Button {
-                        Task {
-                            await signInWithGoogleTapped()
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "globe")
-                            Text("Continuer avec Google")
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .foregroundStyle(AppColors.textPrimary)
+                    .padding(HBMetrics.horizontalPadding)
+                    .padding(.top, HBMetrics.Spacing.l)
+                    .padding(.bottom, HBMetrics.Spacing.xl)
                     .background(
-                        RoundedRectangle(cornerRadius: AppMetrics.controlCornerRadius, style: .continuous)
-                            .fill(AppColors.surface)
+                        RoundedRectangle(cornerRadius: HBMetrics.Radius.card, style: .continuous)
+                            .fill(HBColors.cream)
+                            .ignoresSafeArea(edges: .bottom)
                     )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppMetrics.controlCornerRadius, style: .continuous)
-                            .stroke(AppColors.textSecondary.opacity(0.2), lineWidth: 1)
-                    )
-                    .disabled(viewModel.isLoading)
+                    .offset(y: -HBMetrics.Spacing.m)
                 }
-                .padding(AppMetrics.horizontalPadding)
             }
-            .background(AppColors.background.ignoresSafeArea())
-            .navigationTitle("Connexion")
+            .background(HBColors.charcoal.ignoresSafeArea())
+            .navigationBarHidden(true)
             .alert(
                 "Erreur",
                 isPresented: Binding(
@@ -112,6 +122,43 @@ struct AuthView: View {
                 }
             )
         }
+    }
+
+    private var onboardingHero: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(
+                colors: [HBColors.charcoal, HBColors.terracottaDark],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(HBColors.terracotta.opacity(0.26))
+                .frame(width: 220, height: 220)
+                .offset(x: 120, y: -80)
+
+            Circle()
+                .fill(HBColors.sage.opacity(0.22))
+                .frame(width: 180, height: 180)
+                .offset(x: -80, y: 90)
+
+            VStack(alignment: .leading, spacing: HBMetrics.Spacing.s) {
+                HStack(spacing: HBMetrics.Spacing.s) {
+                    Text("🍽️")
+                        .font(.system(size: 30))
+                    Text("HomelyBites")
+                        .font(HBTypography.display(size: 42))
+                        .foregroundStyle(.white)
+                }
+
+                Text("Repas faits maison, en toute confiance")
+                    .font(HBTypography.body(size: 16, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.88))
+            }
+            .padding(HBMetrics.horizontalPadding)
+            .padding(.bottom, HBMetrics.Spacing.xl)
+        }
+        .frame(height: 280)
     }
 
     private func signInWithGoogleTapped() async {
@@ -146,5 +193,22 @@ private extension UIViewController {
             return tabBarController.selectedViewController?.hbTopMostViewController() ?? tabBarController
         }
         return self
+    }
+}
+
+private extension View {
+    func hbInputStyle() -> some View {
+        self
+            .font(HBTypography.body(size: 15))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
+                    .fill(HBColors.warmWhite)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
+                    .stroke(HBColors.border, lineWidth: 1)
+            )
     }
 }

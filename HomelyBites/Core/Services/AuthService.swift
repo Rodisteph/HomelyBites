@@ -136,6 +136,23 @@ final class AuthService {
         try auth.signOut()
     }
 
+    func sendPasswordReset(email: String) async throws {
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedEmail.isEmpty else {
+            throw AppError.invalidInput("Email requis pour reinitialiser le mot de passe.")
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            auth.sendPasswordReset(withEmail: normalizedEmail) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
+    }
+
     func fetchUserProfile(uid: String) async throws -> AppUser {
         let snapshot = try await db.collection(usersCollection).document(uid).getDocumentAsync()
         var user = try snapshot.data(as: AppUser.self)
