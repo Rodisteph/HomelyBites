@@ -4,6 +4,7 @@ import PassKit
 struct MealDetailView: View {
     @EnvironmentObject private var session: SessionViewModel
     @StateObject private var viewModel: MealDetailViewModel
+    @State private var showReportSheet = false
 
     init(
         meal: Meal,
@@ -67,7 +68,7 @@ struct MealDetailView: View {
                         .foregroundStyle(AppColors.charcoal)
 
                     HStack {
-                        Label("Host", systemImage: "person.circle.fill")
+                        Label("Hôte", systemImage: "person.circle.fill")
                             .font(.bodyMedium)
                         Spacer()
                         Text(viewModel.meal.hostName)
@@ -235,6 +236,22 @@ struct MealDetailView: View {
         .background(AppColors.cream)
         .navigationTitle("Détail")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showReportSheet = true
+                } label: {
+                    Image(systemName: "flag")
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+        }
+        .sheet(isPresented: $showReportSheet) {
+            ReportContentView(
+                contentType: .meal,
+                contentId: viewModel.meal.id
+            )
+        }
         .sheet(
             isPresented: Binding(
                 get: { viewModel.checkoutSession != nil },
