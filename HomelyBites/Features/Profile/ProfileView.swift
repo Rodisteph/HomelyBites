@@ -29,8 +29,8 @@ struct ProfileView: View {
                 }
             }
 
-            Section("Profil host") {
-                TextField("Nom affiche", text: $viewModel.fullName)
+            Section("Profil hôte") {
+                TextField("Nom affiché", text: $viewModel.fullName)
                     .appTextFieldStyle()
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -123,7 +123,7 @@ struct ProfileView: View {
                 }
             }
         }
-        .navigationTitle("Profile host")
+        .navigationTitle("Profil hôte")
         .onAppear {
             if let user = session.appUser {
                 viewModel.load(from: user)

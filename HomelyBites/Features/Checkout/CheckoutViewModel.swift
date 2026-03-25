@@ -43,7 +43,7 @@ final class CheckoutViewModel: ObservableObject {
                 applePayToken: tokenString
             )
 
-            statusMessage = "Payment confirmed. Check your Orders tab."
+            statusMessage = "Paiement confirmé. Consultez l'onglet Commandes."
             paymentSucceeded = true
 
             #if DEBUG

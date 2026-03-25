@@ -1,32 +1,16 @@
 import SwiftUI
 import PassKit
 
-// MARK: - Apple Pay Button (SwiftUI Wrapper)
+// MARK: - Apple Pay Button (Native PKPaymentButton wrapper)
 struct ApplePayButton: View {
     let amount: Int  // Amount in cents
     let onSuccess: (PKPaymentToken) -> Void
     let onError: (Error) -> Void
 
-    @State private var isPresentingPayment = false
-    @Environment(\.presentationMode) var presentationMode
-
     var body: some View {
-        Button(action: {
-            presentApplePay()
-        }) {
-            HStack(spacing: 8) {
-                Image(systemName: "apple.logo")
-                    .font(.dmSans(18, weight: .semibold))
-                Text("Payer avec Apple Pay")
-                    .font(.dmSans(16, weight: .semibold))
-            }
-            .foregroundStyle(.white)
+        ApplePayButtonRepresentable(action: presentApplePay)
             .frame(maxWidth: .infinity, minHeight: 52)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.black)
-            )
-        }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func presentApplePay() {
@@ -49,15 +33,48 @@ struct ApplePayButton: View {
         )
         request.paymentSummaryItems = [paymentItem]
 
-        let controller = PKPaymentAuthorizationController(paymentRequest: request)
-        controller.delegate = ApplePayCoordinator(
+        let coordinator = ApplePayCoordinator(
             onSuccess: onSuccess,
             onError: onError
         )
+        // Retain coordinator for the duration of the payment flow
+        ApplePayCoordinatorHolder.shared.current = coordinator
+
+        let controller = PKPaymentAuthorizationController(paymentRequest: request)
+        controller.delegate = coordinator
         controller.present { presented in
             if !presented {
+                ApplePayCoordinatorHolder.shared.current = nil
                 onError(ApplePayError.presentationFailed)
             }
+        }
+    }
+}
+
+// MARK: - Native PKPaymentButton UIKit Representable
+private struct ApplePayButtonRepresentable: UIViewRepresentable {
+    let action: () -> Void
+
+    func makeUIView(context: Context) -> PKPaymentButton {
+        let button = PKPaymentButton(paymentButtonType: .buy, paymentButtonStyle: .black)
+        button.cornerRadius = 12
+        button.addTarget(context.coordinator, action: #selector(Coordinator.didTap), for: .touchUpInside)
+        return button
+    }
+
+    func updateUIView(_ uiView: PKPaymentButton, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: action)
+    }
+
+    class Coordinator: NSObject {
+        let action: () -> Void
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+        @objc func didTap() {
+            action()
         }
     }
 }
@@ -77,20 +94,21 @@ private class ApplePayCoordinator: NSObject, PKPaymentAuthorizationControllerDel
         didAuthorizePayment payment: PKPayment,
         handler completion: @escaping (PKPaymentAuthorizationResult) -> Void
     ) {
-        // Extract the payment token
         let token = payment.token
-
-        // Call success callback with the token
         onSuccess(token)
-
-        // Complete the authorization with success
-        // The actual payment confirmation should happen in the success callback
         completion(PKPaymentAuthorizationResult(status: .success, errors: nil))
     }
 
     func paymentAuthorizationControllerDidFinish(_ controller: PKPaymentAuthorizationController) {
         controller.dismiss()
+        ApplePayCoordinatorHolder.shared.current = nil
     }
+}
+
+// MARK: - Coordinator Holder (prevents ARC deallocation during payment)
+private class ApplePayCoordinatorHolder {
+    static let shared = ApplePayCoordinatorHolder()
+    var current: ApplePayCoordinator?
 }
 
 // MARK: - Apple Pay Errors

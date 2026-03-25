@@ -32,7 +32,7 @@ struct HostDashboardView: View {
             .padding(.vertical, 20)
         }
         .background(AppColors.cream)
-        .navigationTitle("Host Dashboard")
+        .navigationTitle("Tableau de bord")
         .task {
             guard let hostId = session.appUser?.id else { return }
             viewModel.startListening(hostId: hostId)
@@ -109,7 +109,7 @@ struct HostDashboardView: View {
             Text("Bienvenue, \(user.fullName)")
                 .font(.cormorantDisplay(28, weight: .semibold))
                 .foregroundStyle(AppColors.charcoal)
-            Text("Dashboard Host")
+            Text("Espace hôte")
                 .font(.bodyLarge)
                 .foregroundStyle(AppColors.textSecondary)
         }
@@ -125,7 +125,7 @@ struct HostDashboardView: View {
 
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Stripe status")
+                    Text("Statut paiements")
                         .font(.bodyMedium)
                         .foregroundStyle(AppColors.textSecondary)
                     Text(user.isStripeReady ? "Activé" : "Non activé")
@@ -200,13 +200,15 @@ struct HostDashboardView: View {
                         .font(.bodyMedium)
                         .foregroundStyle(AppColors.textSecondary)
 
-                    Button("Seed 2 meals de test") {
+                    #if DEBUG
+                    Button("Créer 2 plats de test") {
                         Task {
                             await viewModel.seedMeals(host: user)
                         }
                     }
                     .font(.labelLarge)
                     .foregroundStyle(AppColors.terracotta)
+                    #endif
                 }
                 .frame(maxWidth: .infinity)
                 .padding(20)

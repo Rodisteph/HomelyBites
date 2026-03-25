@@ -3,11 +3,14 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var container: AppContainer
     @EnvironmentObject private var session: SessionViewModel
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
     var body: some View {
         Group {
             if session.isBootstrapping {
                 SplashView()
+            } else if !hasSeenOnboarding {
+                OnboardingView(hasSeenOnboarding: $hasSeenOnboarding)
             } else if session.isAuthenticated {
                 authenticatedTabs
             } else {
@@ -43,7 +46,7 @@ struct RootView: View {
                 MapView()
             }
             .tabItem {
-                Label("Map", systemImage: "map")
+                Label("Carte", systemImage: "map")
             }
 
             if session.appUser?.role == .client {
@@ -63,7 +66,7 @@ struct RootView: View {
                     )
                 }
                 .tabItem {
-                    Label("Host", systemImage: "house")
+                    Label("Tableau de bord", systemImage: "house")
                 }
             }
 
@@ -78,7 +81,7 @@ struct RootView: View {
                 SettingsView()
             }
             .tabItem {
-                Label("Settings", systemImage: "gear")
+                Label("Réglages", systemImage: "gear")
             }
         }
         .tint(AppColors.terracotta)
