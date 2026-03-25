@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>HomelyBites - App Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #C4623A;
+    --primary-dark: #9B4A2A;
+    --primary-light: #F2D5C8;
+    --charcoal: #2C2825;
+    --cream: #FAF7F2;
+    --muted: #A09890;
+    --border: #EDE8E2;
+    --sage: #7A8C6E;
+    --success: #4A7C59;
+    --danger: #B04040;
+    --info: #3A6B9B;
+    --white: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a1a;
+    display: flex;
+    gap: 32px;
+    padding: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+  }
+
+  .screen-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .screen-label {
+    color: #888;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .iphone {
+    width: 390px;
+    height: 844px;
+    background: var(--cream);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 3px #333;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Status Bar */
+  .status-bar {
+    height: 54px;
+    padding: 14px 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .status-bar .time { font-size: 15px; font-weight: 600; color: var(--charcoal); }
+  .status-bar .icons { display: flex; gap: 6px; align-items: center; }
+  .status-bar .icons span { font-size: 13px; color: var(--charcoal); }
+
+  /* Dynamic Island */
+  .dynamic-island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 36px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 10;
+  }
+
+  /* Nav Bar */
+  .nav-bar {
+    height: 44px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .nav-bar .title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--charcoal);
+  }
+  .nav-bar .large-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--charcoal);
+    padding: 0 20px 8px;
+  }
+  .nav-bar .back { color: var(--primary); font-size: 17px; cursor: pointer; }
+  .nav-bar .action { color: var(--muted); font-size: 17px; }
+
+  /* Tab Bar */
+  .tab-bar {
+    height: 83px;
+    background: var(--white);
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-around;
+    padding-top: 8px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .tab-item.active { color: var(--primary); }
+  .tab-item .tab-icon { font-size: 22px; }
+
+  /* Content */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .content::-webkit-scrollbar { display: none; }
+
+  /* Search Bar */
+  .search-bar {
+    margin: 8px 20px 4px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.04);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  /* Category Pills */
+  .category-bar {
+    display: flex;
+    gap: 10px;
+    padding: 12px 20px;
+    overflow-x: auto;
+  }
+  .pill {
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pill.active { background: var(--primary); color: white; }
+  .pill.inactive { background: var(--white); color: var(--muted); }
+
+  /* Section Title */
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--charcoal);
+    padding: 8px 20px;
+  }
+
+  /* Meal Card */
+  .meal-card {
+    margin: 8px 20px;
+    background: var(--white);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(44,40,37,0.08);
+    border: 1px solid rgba(160,152,144,0.1);
+  }
+  .meal-card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    background: var(--border);
+    display: block;
+  }
+  .meal-card .card-body { padding: 16px; }
+  .meal-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .meal-card .card-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--charcoal);
+    line-height: 1.2;
+  }
+  .meal-card .card-price {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary);
+    white-space: nowrap;
+  }
+  .meal-card .card-desc {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  .meal-card .card-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .tags { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .tag {
+    font-size: 10px;
+    padding: 5px 10px;
+    background: rgba(242,213,200,0.3);
+    color: var(--primary-dark);
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  /* Meal placeholder */
+  .img-placeholder {
+    width: 100%;
+    height: 180px;
+    background: linear-gradient(135deg, var(--border) 0%, var(--primary-light) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    color: var(--muted);
+    opacity: 0.5;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    width: 100%;
+    padding: 16px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-secondary {
+    width: 100%;
+    padding: 16px;
+    background: var(--cream);
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-apple-pay {
+    width: 100%;
+    padding: 16px;
+    background: #000;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* Info Card */
+  .info-card {
+    margin: 0 20px;
+    padding: 16px;
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(44,40,37,0.08);
+    border: 1px solid rgba(160,152,144,0.1);
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+  }
+  .info-label { font-size: 14px; color: var(--charcoal); }
+  .info-value { font-size: 15px; font-weight: 500; color: var(--muted); }
+
+  /* Stepper */
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .stepper-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stepper-value {
+    font-size: 20px;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+    color: var(--charcoal);
+  }
+
+  /* Total row */
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    margin-top: 8px;
+  }
+  .total-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--charcoal);
+  }
+  .total-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+  /* Text field */
+  .text-field {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid rgba(160,152,144,0.2);
+    border-radius: 12px;
+    background: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    color: var(--muted);
+    outline: none;
+  }
+
+  /* Onboarding */
+  .onboarding-icon {
+    font-size: 56px;
+    color: var(--primary);
+    text-align: center;
+  }
+  .onboarding-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--charcoal);
+    text-align: center;
+    margin-top: 20px;
+  }
+  .onboarding-desc {
+    font-size: 16px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+    padding: 0 32px;
+    margin-top: 12px;
+  }
+  .dots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 24px;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .dot.active { background: var(--primary); }
+  .dot.inactive { background: var(--border); }
+
+  /* Success screen */
+  .success-icon {
+    font-size: 72px;
+    color: var(--success);
+    text-align: center;
+  }
+  .success-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--charcoal);
+    text-align: center;
+    margin-top: 16px;
+  }
+  .success-desc {
+    font-size: 14px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+    padding: 0 32px;
+    margin-top: 12px;
+    font-weight: 500;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+  }
+  .badge-pending { background: var(--primary); }
+  .badge-success { background: var(--success); }
+  .badge-danger { background: var(--danger); }
+
+  /* Settings list */
+  .settings-section {
+    margin: 16px 20px 0;
+    background: var(--white);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .settings-header {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 24px 20px 8px;
+    letter-spacing: 0.5px;
+  }
+  .settings-row {
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row .label { font-size: 16px; color: var(--charcoal); }
+  .settings-row .value { font-size: 16px; color: var(--muted); }
+  .settings-row .chevron { color: var(--muted); font-size: 14px; }
+  .settings-row.destructive .label { color: var(--danger); }
+  .settings-row .nav { display: flex; align-items: center; gap: 4px; }
+
+  /* Logo */
+  .brand-logo {
+    width: 80px; height: 80px;
+    background: rgba(242,213,200,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+  }
+  .brand-logo span {
+    font-size: 40px;
+    color: var(--primary);
+  }
+  .brand-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--charcoal);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Home indicator */
+  .home-indicator {
+    height: 5px;
+    width: 134px;
+    background: var(--charcoal);
+    border-radius: 3px;
+    margin: 0 auto;
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0.2;
+  }
+
+  /* Hero image for detail */
+  .hero-placeholder {
+    width: calc(100% - 40px);
+    height: 280px;
+    margin: 8px 20px;
+    background: linear-gradient(135deg, #e8c4a8 0%, var(--primary-light) 50%, #d4a574 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-placeholder::after {
+    content: '🍝';
+    font-size: 80px;
+    opacity: 0.6;
+  }
+
+  .detail-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0 20px;
+    margin-top: 16px;
+  }
+  .detail-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--charcoal);
+    line-height: 1.1;
+  }
+  .detail-price {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary);
+    white-space: nowrap;
+  }
+  .detail-desc {
+    padding: 8px 20px 0;
+    font-size: 16px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .section-card-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--charcoal);
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== SCREEN 1: ONBOARDING ==================== -->
+<div class="screen-container">
+  <div class="screen-label">Onboarding</div>
+  <div class="iphone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <div class="icons"><span>&#9679;&#9679;&#9679;&#9679;</span> <span>&#128267;</span></div>
+    </div>
+    <div class="content" style="display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 20px;">
+      <div style="flex:1;"></div>
+      <div class="brand-logo"><span>&#127860;</span></div>
+      <div class="brand-name">HomelyBites</div>
+      <div style="height: 48px;"></div>
+      <div class="onboarding-icon">&#127869;</div>
+      <div class="onboarding-title">Repas faits maison</div>
+      <div class="onboarding-desc">Découvrez des repas authentiques préparés par des cuisiniers passionnés près de chez vous.</div>
+      <div class="dots">
+        <div class="dot active"></div>
+        <div class="dot inactive"></div>
+        <div class="dot inactive"></div>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="width: 100%; padding: 0 20px 48px;">
+        <button class="btn-primary">Suivant</button>
+        <div style="text-align:center; margin-top:12px; color:var(--muted); font-size:14px; font-weight:500;">Passer</div>
+      </div>
+    </div>
+    <div class="home-indicator"></div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 2: HOME ==================== -->
+<div class="screen-container">
+  <div class="screen-label">Accueil - Liste des repas</div>
+  <div class="iphone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <div class="icons"><span>&#9679;&#9679;&#9679;&#9679;</span> <span>&#128267;</span></div>
+    </div>
+    <div class="nav-bar">
+      <div class="large-title" style="font-size:34px;">Repas</div>
+    </div>
+    <div class="content">
+      <div class="search-bar">
+        <span>&#128269;</span> Rechercher un plat, un hôte...
+      </div>
+      <div class="category-bar">
+        <div class="pill active">Tous</div>
+        <div class="pill inactive">italian</div>
+        <div class="pill inactive">veggie</div>
+        <div class="pill inactive">healthy</div>
+        <div class="pill inactive">family</div>
+      </div>
+      <div class="section-title">Repas près de vous</div>
+
+      <div class="meal-card">
+        <div class="img-placeholder" style="height:180px; background: linear-gradient(135deg, #e8c4a8, #f2d5c8, #d4a574);">&#127837;</div>
+        <div class="card-body">
+          <div class="card-header">
+            <div class="card-title">Lasagna Maison</div>
+            <div class="card-price">12,00 &euro;</div>
+          </div>
+          <div class="card-desc">Lasagne boeuf, bechamel, portion genereuse.</div>
+          <div class="card-meta">
+            <span>&#128100; Marie</span>
+            <span>&#127807; 6 portions</span>
+          </div>
+          <div class="tags">
+            <span class="tag">#italian</span>
+            <span class="tag">#family</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="meal-card">
+        <div class="img-placeholder" style="height:180px; background: linear-gradient(135deg, #c8d8b8, #e8e4d0, #b8c8a0);">&#127858;</div>
+        <div class="card-body">
+          <div class="card-header">
+            <div class="card-title">Couscous Veggie</div>
+            <div class="card-price">9,80 &euro;</div>
+          </div>
+          <div class="card-desc">Semoule fine, legumes frais et pois chiches.</div>
+          <div class="card-meta">
+            <span>&#128100; Marie</span>
+            <span>&#127807; 8 portions</span>
+          </div>
+          <div class="tags">
+            <span class="tag">#veggie</span>
+            <span class="tag">#healthy</span>
+          </div>
+        </div>
+      </div>
+      <div style="height:20px;"></div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item active"><div class="tab-icon">&#127860;</div>Repas</div>
+      <div class="tab-item"><div class="tab-icon">&#128506;</div>Carte</div>
+      <div class="tab-item"><div class="tab-icon">&#128722;</div>Commandes</div>
+      <div class="tab-item"><div class="tab-icon">&#128100;</div>Profil</div>
+      <div class="tab-item"><div class="tab-icon">&#9881;</div>Réglages</div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 3: DETAIL ==================== -->
+<div class="screen-container">
+  <div class="screen-label">Détail du repas</div>
+  <div class="iphone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <div class="icons"><span>&#9679;&#9679;&#9679;&#9679;</span> <span>&#128267;</span></div>
+    </div>
+    <div class="nav-bar">
+      <span class="back">&#8249; Repas</span>
+      <span class="title">Détail</span>
+      <span class="action" title="Signaler">&#9873;</span>
+    </div>
+    <div class="content">
+      <div class="hero-placeholder"></div>
+
+      <div class="detail-title-row">
+        <div class="detail-title">Lasagna<br>Maison</div>
+        <div class="detail-price">12,00 &euro;</div>
+      </div>
+      <div class="detail-desc">Lasagne boeuf, bechamel, portion genereuse. Recette familiale italienne.</div>
+
+      <div style="height: 16px;"></div>
+      <div class="info-card">
+        <div class="section-card-title">Informations</div>
+        <div class="info-row">
+          <span class="info-label">&#128100; Hôte</span>
+          <span class="info-value">Marie</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">&#128092; Service</span>
+          <span class="info-value">Sur place</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">&#127807; Disponible</span>
+          <span class="info-value">6 portions</span>
+        </div>
+      </div>
+
+      <div style="height: 16px;"></div>
+      <div class="info-card">
+        <div class="section-card-title">Réservation</div>
+        <div class="info-row">
+          <span class="info-label">Portions</span>
+          <div class="stepper">
+            <button class="stepper-btn">−</button>
+            <span class="stepper-value">2</span>
+            <button class="stepper-btn">+</button>
+          </div>
+        </div>
+        <div style="margin-top: 12px;">
+          <div style="font-size:14px; color:var(--charcoal); margin-bottom:8px;">Note (optionnelle)</div>
+          <div class="text-field">Allergies, préférences...</div>
+        </div>
+        <div class="total-row">
+          <span class="total-label">Total</span>
+          <span class="total-value">24,00 &euro;</span>
+        </div>
+      </div>
+
+      <div style="padding: 16px 20px 32px;">
+        <button class="btn-apple-pay">&#63743; Acheter avec Apple Pay</button>
+        <div style="height: 12px;"></div>
+        <button class="btn-primary">Réserver &amp; payer par carte</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 4: PAYMENT SUCCESS ==================== -->
+<div class="screen-container">
+  <div class="screen-label">Paiement réussi</div>
+  <div class="iphone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <div class="icons"><span>&#9679;&#9679;&#9679;&#9679;</span> <span>&#128267;</span></div>
+    </div>
+    <div class="content" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 20px;">
+      <div style="flex:1;"></div>
+      <div class="success-icon">&#9989;</div>
+      <div class="success-title">Paiement réussi !</div>
+      <div class="success-desc">Votre commande a été confirmée.<br>Consultez l'onglet Commandes pour suivre son statut.</div>
+
+      <div style="height: 24px;"></div>
+      <div class="info-card" style="width: calc(100% - 0px); text-align:center;">
+        <div style="font-size:18px; font-weight:600; color:var(--charcoal);">Lasagna Maison</div>
+        <div style="font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:600; color:var(--primary); margin-top:8px;">24,00 &euro;</div>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="width: 100%; padding: 0 0 48px;">
+        <button class="btn-primary">Fermer</button>
+      </div>
+    </div>
+    <div class="home-indicator"></div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 5: SETTINGS ==================== -->
+<div class="screen-container">
+  <div class="screen-label">Réglages</div>
+  <div class="iphone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <div class="icons"><span>&#9679;&#9679;&#9679;&#9679;</span> <span>&#128267;</span></div>
+    </div>
+    <div class="nav-bar">
+      <div class="large-title" style="font-size:34px;">Réglages</div>
+    </div>
+    <div class="content" style="background: #F2F2F7;">
+      <div class="settings-header">Mon profil</div>
+      <div class="settings-section">
+        <div class="settings-row">
+          <span class="label">Nom</span>
+          <span class="value">Marie Dupont</span>
+        </div>
+        <div class="settings-row">
+          <span class="label">Rôle</span>
+          <span class="value">Hôte</span>
+        </div>
+        <div class="settings-row">
+          <span class="label">Niveau</span>
+          <span class="value">Intermédiaire</span>
+        </div>
+        <div class="settings-row">
+          <span class="label">Modifier le profil hôte</span>
+          <span class="chevron">&#8250;</span>
+        </div>
+      </div>
+
+      <div class="settings-header">Informations légales</div>
+      <div class="settings-section">
+        <div class="settings-row">
+          <span class="label">Politique de confidentialité</span>
+          <span class="chevron">&#8250;</span>
+        </div>
+        <div class="settings-row">
+          <span class="label">Conditions générales d'utilisation</span>
+          <span class="chevron">&#8250;</span>
+        </div>
+      </div>
+
+      <div style="height:16px;"></div>
+      <div class="settings-section">
+        <div class="settings-row destructive">
+          <span class="label">Se déconnecter</span>
+        </div>
+      </div>
+
+      <div style="height:16px;"></div>
+      <div class="settings-section">
+        <div class="settings-row destructive">
+          <span class="label">Supprimer mon compte</span>
+        </div>
+      </div>
+      <div style="padding: 8px 20px; font-size:12px; color:var(--muted);">
+        Cette action est irréversible. Toutes vos données seront supprimées.
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item"><div class="tab-icon">&#127860;</div>Repas</div>
+      <div class="tab-item"><div class="tab-icon">&#128506;</div>Carte</div>
+      <div class="tab-item"><div class="tab-icon">&#128722;</div>Commandes</div>
+      <div class="tab-item"><div class="tab-icon">&#128100;</div>Profil</div>
+      <div class="tab-item active"><div class="tab-icon">&#9881;</div>Réglages</div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
