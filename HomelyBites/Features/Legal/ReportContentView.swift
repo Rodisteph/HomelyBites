@@ -20,15 +20,15 @@ struct ReportContentView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 48))
-                                .foregroundStyle(AppColors.success)
+                                .foregroundStyle(HBTheme.Colors.success)
 
                             Text("Signalement envoyé")
-                                .font(.headlineMedium)
-                                .foregroundStyle(AppColors.charcoal)
+                                .font(HBTheme.Font.title(22))
+                                .foregroundStyle(HBTheme.Colors.text)
 
                             Text("Merci pour votre signalement. Notre équipe examinera ce contenu dans les plus brefs délais.")
-                                .font(.bodyMedium)
-                                .foregroundStyle(AppColors.textSecondary)
+                                .font(HBTheme.Font.body(14))
+                                .foregroundStyle(HBTheme.Colors.textSecondary)
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
@@ -43,16 +43,16 @@ struct ReportContentView: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(reason.title)
-                                            .font(.bodyLarge)
-                                            .foregroundStyle(AppColors.charcoal)
+                                            .font(HBTheme.Font.body(16))
+                                            .foregroundStyle(HBTheme.Colors.text)
                                         Text(reason.subtitle)
-                                            .font(.bodySmall)
-                                            .foregroundStyle(AppColors.textSecondary)
+                                            .font(HBTheme.Font.label(12))
+                                            .foregroundStyle(HBTheme.Colors.textSecondary)
                                     }
                                     Spacer()
                                     if selectedReason == reason {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(AppColors.primary)
+                                            .foregroundStyle(HBTheme.Colors.primary)
                                     }
                                 }
                             }
@@ -65,21 +65,13 @@ struct ReportContentView: View {
                     }
 
                     Section {
-                        Button {
+                        PrimaryButton(
+                            title: "Envoyer le signalement",
+                            isLoading: isSubmitting,
+                            isDisabled: selectedReason == nil || isSubmitting
+                        ) {
                             Task { await submitReport() }
-                        } label: {
-                            if isSubmitting {
-                                HStack {
-                                    ProgressView()
-                                        .tint(.white)
-                                    Text("Envoi...")
-                                }
-                            } else {
-                                Text("Envoyer le signalement")
-                            }
                         }
-                        .buttonStyle(PrimaryButtonStyle(isLoading: isSubmitting))
-                        .disabled(selectedReason == nil || isSubmitting)
                     }
                 }
             }
@@ -98,9 +90,8 @@ struct ReportContentView: View {
         isSubmitting = true
         defer { isSubmitting = false }
 
-        // Store report in Firestore
         do {
-            let db = try FirestoreService()
+            let db = FirestoreService()
             try await db.submitReport(
                 contentType: contentType,
                 contentId: contentId,
@@ -109,7 +100,6 @@ struct ReportContentView: View {
             )
             didSubmit = true
         } catch {
-            // Silently succeed for now - reports can be retried
             didSubmit = true
         }
     }

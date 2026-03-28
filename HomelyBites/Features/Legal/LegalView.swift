@@ -6,8 +6,8 @@ struct PrivacyPolicyView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Politique de confidentialité")
-                    .font(.cormorantDisplay(32, weight: .semibold))
-                    .foregroundStyle(AppColors.charcoal)
+                    .font(HBTheme.Font.display(32))
+                    .foregroundStyle(HBTheme.Colors.text)
 
                 Group {
                     legalSection(
@@ -82,13 +82,13 @@ struct PrivacyPolicyView: View {
                 }
 
                 Text("Dernière mise à jour : Mars 2026")
-                    .font(.bodySmall)
-                    .foregroundStyle(AppColors.textSecondary)
+                    .font(HBTheme.Font.label(12))
+                    .foregroundStyle(HBTheme.Colors.textSecondary)
                     .padding(.top, 8)
             }
-            .padding(AppMetrics.horizontalPadding)
+            .padding(HBTheme.Spacing.screen)
         }
-        .background(AppColors.cream)
+        .hbBackground()
         .navigationTitle("Confidentialité")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -100,8 +100,8 @@ struct TermsOfServiceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Conditions générales d'utilisation")
-                    .font(.cormorantDisplay(28, weight: .semibold))
-                    .foregroundStyle(AppColors.charcoal)
+                    .font(HBTheme.Font.display(28))
+                    .foregroundStyle(HBTheme.Colors.text)
 
                 Group {
                     legalSection(
@@ -188,13 +188,13 @@ struct TermsOfServiceView: View {
                 }
 
                 Text("Dernière mise à jour : Mars 2026")
-                    .font(.bodySmall)
-                    .foregroundStyle(AppColors.textSecondary)
+                    .font(HBTheme.Font.label(12))
+                    .foregroundStyle(HBTheme.Colors.textSecondary)
                     .padding(.top, 8)
             }
-            .padding(AppMetrics.horizontalPadding)
+            .padding(HBTheme.Spacing.screen)
         }
-        .background(AppColors.cream)
+        .hbBackground()
         .navigationTitle("CGU")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -204,11 +204,11 @@ struct TermsOfServiceView: View {
 private func legalSection(title: String, content: String) -> some View {
     VStack(alignment: .leading, spacing: 8) {
         Text(title)
-            .font(.headlineSmall)
-            .foregroundStyle(AppColors.charcoal)
+            .font(HBTheme.Font.body(18, weight: .semibold))
+            .foregroundStyle(HBTheme.Colors.text)
         Text(content)
-            .font(.bodyMedium)
-            .foregroundStyle(AppColors.textSecondary)
+            .font(HBTheme.Font.body(14))
+            .foregroundStyle(HBTheme.Colors.textSecondary)
             .lineSpacing(4)
     }
 }

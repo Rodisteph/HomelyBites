@@ -25,21 +25,19 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            AppColors.cream.ignoresSafeArea()
+            HBTheme.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer()
 
-                // Logo
                 BrandLogoView(size: 80)
                     .padding(.bottom, 8)
 
                 Text("HomelyBites")
-                    .font(.cormorantDisplay(36, weight: .semibold))
-                    .foregroundStyle(AppColors.charcoal)
+                    .font(HBTheme.Font.display(36))
+                    .foregroundStyle(HBTheme.Colors.text)
                     .padding(.bottom, 40)
 
-                // Page Content
                 TabView(selection: $currentPage) {
                     ForEach(pages.indices, id: \.self) { index in
                         onboardingPageView(pages[index])
@@ -49,11 +47,10 @@ struct OnboardingView: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(height: 220)
 
-                // Page Indicators
                 HStack(spacing: 8) {
                     ForEach(pages.indices, id: \.self) { index in
                         Circle()
-                            .fill(index == currentPage ? AppColors.primary : AppColors.border)
+                            .fill(index == currentPage ? HBTheme.Colors.primary : HBTheme.Colors.border)
                             .frame(width: 8, height: 8)
                             .animation(.easeInOut(duration: 0.2), value: currentPage)
                     }
@@ -62,29 +59,26 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                // Action Buttons
                 VStack(spacing: 12) {
                     if currentPage < pages.count - 1 {
-                        Button("Suivant") {
+                        PrimaryButton(title: "Suivant") {
                             withAnimation {
                                 currentPage += 1
                             }
                         }
-                        .buttonStyle(PrimaryButtonStyle())
 
                         Button("Passer") {
                             hasSeenOnboarding = true
                         }
-                        .font(.dmSans(14, weight: .medium))
-                        .foregroundStyle(AppColors.textSecondary)
+                        .font(HBTheme.Font.body(14, weight: .medium))
+                        .foregroundStyle(HBTheme.Colors.textSecondary)
                     } else {
-                        Button("Commencer") {
+                        PrimaryButton(title: "Commencer") {
                             hasSeenOnboarding = true
                         }
-                        .buttonStyle(PrimaryButtonStyle())
                     }
                 }
-                .padding(.horizontal, AppMetrics.horizontalPadding)
+                .padding(.horizontal, HBTheme.Spacing.screen)
                 .padding(.bottom, 48)
             }
         }
@@ -94,15 +88,15 @@ struct OnboardingView: View {
         VStack(spacing: 20) {
             Image(systemName: page.icon)
                 .font(.system(size: 56))
-                .foregroundStyle(AppColors.primary)
+                .foregroundStyle(HBTheme.Colors.primary)
 
             Text(page.title)
-                .font(.headlineLarge)
-                .foregroundStyle(AppColors.charcoal)
+                .font(HBTheme.Font.title(24))
+                .foregroundStyle(HBTheme.Colors.text)
 
             Text(page.description)
-                .font(.bodyLarge)
-                .foregroundStyle(AppColors.textSecondary)
+                .font(HBTheme.Font.body(16))
+                .foregroundStyle(HBTheme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
                 .lineSpacing(4)
