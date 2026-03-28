@@ -16,9 +16,9 @@ struct ApplePayButton: View {
         }) {
             HStack(spacing: 8) {
                 Image(systemName: "apple.logo")
-                    .font(.dmSans(18, weight: .semibold))
+                    .font(HBTheme.Font.body(18, weight: .semibold))
                 Text("Payer avec Apple Pay")
-                    .font(.dmSans(16, weight: .semibold))
+                    .font(HBTheme.Font.body(16, weight: .semibold))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 52)

@@ -6,6 +6,7 @@ struct MealListView: View {
     @StateObject private var viewModel = MealListViewModel()
     @State private var searchText = ""
     @State private var selectedCategory = "Tous"
+    @State private var showMap = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,74 +15,27 @@ struct MealListView: View {
                     .zIndex(1)
             }
 
-            List {
-                if viewModel.isLoading && viewModel.meals.isEmpty {
-                    ProgressView("Chargement des repas...")
-                        .tint(AppColors.terracotta)
-                } else if viewModel.meals.isEmpty {
-                    ContentUnavailableView(
-                        "Aucun repas",
-                        systemImage: "fork.knife.circle",
-                        description: Text("Les hosts n'ont pas encore publié de repas.")
-                    )
-                } else if filteredMeals.isEmpty {
-                    ContentUnavailableView(
-                        "Aucun résultat",
-                        systemImage: "magnifyingglass",
-                        description: Text("Ajuste ta recherche ou la catégorie.")
-                    )
-                } else {
-                    Section {
-                        Text("Repas près de vous")
-                            .font(.cormorantDisplay(24, weight: .semibold))
-                            .foregroundStyle(AppColors.charcoal)
-                            .padding(.vertical, 8)
+            if showMap {
+                MapView()
+            } else {
+                mealList
+            }
+        }
+        .hbBackground()
+        .navigationTitle("Repas")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showMap.toggle()
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-
-                    ForEach(nearbyMeals) { meal in
-                        NavigationLink {
-                            MealDetailView(
-                                meal: meal,
-                                functionsService: container.cloudFunctionsService
-                            )
-                        } label: {
-                            MealRowView(meal: meal)
-                        }
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                    }
-
-                    Section {
-                        Text("Tous les repas")
-                            .font(.cormorantDisplay(24, weight: .semibold))
-                            .foregroundStyle(AppColors.charcoal)
-                            .padding(.vertical, 8)
-                            .padding(.top, 16)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-
-                    ForEach(filteredMeals) { meal in
-                        NavigationLink {
-                            MealDetailView(
-                                meal: meal,
-                                functionsService: container.cloudFunctionsService
-                            )
-                        } label: {
-                            MealRowView(meal: meal)
-                        }
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                    }
+                } label: {
+                    Image(systemName: showMap ? "list.bullet" : "map")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HBTheme.Colors.primary)
                 }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
         }
-        .background(AppColors.cream)
-        .navigationTitle("Repas")
         .searchable(text: $searchText, prompt: "Rechercher un plat, un host...")
         .refreshable {
             await viewModel.loadMeals()
@@ -97,13 +51,48 @@ struct MealListView: View {
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             ),
-            actions: {
-                Button("OK", role: .cancel) {}
-            },
-            message: {
-                Text(viewModel.errorMessage ?? "")
-            }
+            actions: { Button("OK", role: .cancel) {} },
+            message: { Text(viewModel.errorMessage ?? "") }
         )
+    }
+
+    private var mealList: some View {
+        ScrollView {
+            LazyVStack(spacing: HBTheme.Spacing.m) {
+                if viewModel.isLoading && viewModel.meals.isEmpty {
+                    ProgressView("Chargement...")
+                        .tint(HBTheme.Colors.primary)
+                        .padding(.top, 60)
+                } else if filteredMeals.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: viewModel.meals.isEmpty ? "fork.knife.circle" : "magnifyingglass")
+                            .font(.system(size: 40, weight: .light))
+                            .foregroundStyle(HBTheme.Colors.textSecondary.opacity(0.5))
+                        Text(viewModel.meals.isEmpty ? "Aucun repas disponible" : "Aucun resultat")
+                            .font(HBTheme.Font.title(22))
+                            .foregroundStyle(HBTheme.Colors.text)
+                        Text(viewModel.meals.isEmpty ? "Les repas apparaitront ici." : "Ajuste ta recherche ou la categorie.")
+                            .font(HBTheme.Font.body(14))
+                            .foregroundStyle(HBTheme.Colors.textSecondary)
+                    }
+                    .padding(.top, 80)
+                } else {
+                    ForEach(filteredMeals) { meal in
+                        NavigationLink {
+                            MealDetailView(
+                                meal: meal,
+                                functionsService: container.cloudFunctionsService
+                            )
+                        } label: {
+                            MealRowView(meal: meal)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.horizontal, HBTheme.Spacing.screen)
+            .padding(.vertical, HBTheme.Spacing.m)
+        }
     }
 
     private var categoryBar: some View {
@@ -114,27 +103,14 @@ struct MealListView: View {
                         selectedCategory = category
                     } label: {
                         Text(category)
-                            .font(.dmSans(14, weight: .medium))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(
-                                selectedCategory == category ?
-                                AppColors.terracotta :
-                                AppColors.surface,
-                                in: Capsule()
-                            )
-                            .foregroundStyle(
-                                selectedCategory == category ?
-                                Color.white :
-                                AppColors.textSecondary
-                            )
+                            .hbChipStyle(selected: selectedCategory == category)
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, HBTheme.Spacing.m)
+            .padding(.vertical, HBTheme.Spacing.s)
         }
-        .background(AppColors.cream)
+        .background(HBTheme.Colors.background)
     }
 
     private var categories: [String] {
@@ -146,21 +122,17 @@ struct MealListView: View {
         viewModel.meals.filter { meal in
             let byCategory = selectedCategory == "Tous" || meal.tags.contains(selectedCategory)
             guard byCategory else { return false }
-
             let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard !query.isEmpty else { return true }
-
             return meal.title.lowercased().contains(query)
                 || meal.description.lowercased().contains(query)
                 || meal.hostName.lowercased().contains(query)
                 || meal.tags.contains(where: { $0.lowercased().contains(query) })
         }
     }
-
-    private var nearbyMeals: [Meal] {
-        Array(filteredMeals.prefix(3))
-    }
 }
+
+// MARK: - Meal Row
 
 private struct MealRowView: View {
     let meal: Meal
@@ -176,34 +148,34 @@ private struct MealRowView: View {
                             .resizable()
                             .scaledToFill()
                     default:
-                        RoundedRectangle(cornerRadius: AppMetrics.cardCornerRadius)
-                            .fill(AppColors.creamDark)
+                        Rectangle()
+                            .fill(HBTheme.Colors.skeleton)
                             .overlay {
                                 Image(systemName: "photo")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(AppColors.textSecondary.opacity(0.5))
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(HBTheme.Colors.textSecondary.opacity(0.4))
                             }
                     }
                 }
                 .frame(height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: AppMetrics.cardCornerRadius))
+                .clipShape(RoundedRectangle(cornerRadius: HBTheme.Radius.card))
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top) {
                     Text(meal.title)
-                        .font(.cormorantDisplay(22, weight: .semibold))
-                        .foregroundStyle(AppColors.charcoal)
+                        .font(HBTheme.Font.cardTitle)
+                        .foregroundStyle(HBTheme.Colors.text)
                         .lineLimit(2)
                     Spacer()
                     Text(meal.priceCents.asEuro())
-                        .font(.dmSans(18, weight: .bold))
-                        .foregroundStyle(AppColors.terracotta)
+                        .font(HBTheme.Font.price)
+                        .foregroundStyle(HBTheme.Colors.primary)
                 }
 
                 Text(meal.description)
-                    .font(.bodyMedium)
-                    .foregroundStyle(AppColors.textSecondary)
+                    .font(HBTheme.Font.body(14))
+                    .foregroundStyle(HBTheme.Colors.textSecondary)
                     .lineLimit(2)
 
                 HStack(spacing: 12) {
@@ -211,22 +183,22 @@ private struct MealRowView: View {
                     Spacer()
                     Label("\(meal.availablePortions) portions", systemImage: "leaf.fill")
                 }
-                .font(.labelMedium)
-                .foregroundStyle(AppColors.textSecondary)
+                .font(HBTheme.Font.caption)
+                .foregroundStyle(HBTheme.Colors.textSecondary)
 
                 if !meal.tags.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(meal.tags, id: \.self) { tag in
                                 Text("#\(tag)")
-                                    .font(.labelSmall)
+                                    .font(HBTheme.Font.label(11))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 5)
                                     .background(
-                                        AppColors.terracottaLight.opacity(0.3),
+                                        HBTheme.Colors.primaryLight.opacity(0.2),
                                         in: Capsule()
                                     )
-                                    .foregroundStyle(AppColors.terracottaDark)
+                                    .foregroundStyle(HBTheme.Colors.primaryDark)
                             }
                         }
                     }
@@ -234,6 +206,6 @@ private struct MealRowView: View {
             }
         }
         .padding(.vertical, 4)
-        .appCard()
+        .hbCard()
     }
 }

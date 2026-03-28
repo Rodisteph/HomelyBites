@@ -11,46 +11,26 @@ struct MapView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPin: MealMapPin?
     @State private var radiusKm: Double = 10
-    @State private var isBackfillingLocations = false
 
     var body: some View {
         Group {
             if viewModel.isLoading && filteredPins.isEmpty {
                 ProgressView("Chargement de la carte...")
-                    .tint(AppColors.primary)
+                    .tint(HBTheme.Colors.primary)
             } else if filteredPins.isEmpty {
-                VStack(spacing: 16) {
-                    ContentUnavailableView(
-                        "Aucun repas disponible",
-                        systemImage: "map",
-                        description: Text("Les repas apparaîtront sur la carte dès qu'ils seront publiés avec une localisation.")
-                    )
-
-                    #if DEBUG
-                    VStack(spacing: 8) {
-                        Text("Debug: \(viewModel.pins.count) repas trouvés sans localisation")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        Button {
-                            Task { await backfillLocationsDevOnly() }
-                        } label: {
-                            if isBackfillingLocations {
-                                HStack {
-                                    ProgressView()
-                                    Text("Backfill en cours...")
-                                }
-                            } else {
-                                Text("Backfill localisation (dev only)")
-                            }
-                        }
-                        .buttonStyle(PrimaryButtonStyle(isLoading: isBackfillingLocations))
-                        .disabled(isBackfillingLocations)
-                    }
-                    .padding(.horizontal, 20)
-                    #endif
+                VStack(spacing: 12) {
+                    Image(systemName: "map")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(HBTheme.Colors.textSecondary.opacity(0.5))
+                    Text("Aucun repas disponible")
+                        .font(HBTheme.Font.title(22))
+                        .foregroundStyle(HBTheme.Colors.text)
+                    Text("Les repas apparaitront sur la carte des qu'ils seront publies.")
+                        .font(HBTheme.Font.body(14))
+                        .foregroundStyle(HBTheme.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, HBTheme.Spacing.screen)
             } else {
                 VStack(spacing: 0) {
                     controls
@@ -64,64 +44,27 @@ struct MapView: View {
                     .mapStyle(.standard)
 
                     if let selectedPin {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text(selectedPin.title)
-                                    .font(.headline)
-                                    .foregroundStyle(AppColors.textPrimary)
-                                Spacer()
-                                Text(selectedPin.priceCents.asEuro())
-                                    .foregroundStyle(AppColors.primary)
-                            }
-
-                            Text(selectedPin.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-
-                            NavigationLink {
-                                MealDetailView(
-                                    meal: selectedPin.meal,
-                                    functionsService: container.cloudFunctionsService
-                                )
-                            } label: {
-                                Text("Voir details")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(PrimaryButtonStyle(isLoading: false))
-                        }
-                        .padding(12)
-                        .background(AppColors.surface)
+                        selectedPinCard(pin: selectedPin)
                     }
                 }
             }
         }
-        .navigationTitle("Map")
-        .task {
-            await loadMap()
-        }
-        .refreshable {
-            await loadMap()
-        }
-        .onChange(of: locationService.centerCoordinateToken) { _, _ in
-            recenterMap()
-        }
-        .onChange(of: radiusKm) { _, _ in
-            recenterMap()
-        }
+        .task { await loadMap() }
+        .refreshable { await loadMap() }
+        .onChange(of: locationService.centerCoordinateToken) { _, _ in recenterMap() }
+        .onChange(of: radiusKm) { _, _ in recenterMap() }
         .alert(
             "Erreur",
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             ),
-            actions: {
-                Button("OK", role: .cancel) {}
-            },
-            message: {
-                Text(viewModel.errorMessage ?? "")
-            }
+            actions: { Button("OK", role: .cancel) {} },
+            message: { Text(viewModel.errorMessage ?? "") }
         )
     }
+
+    // MARK: - Controls
 
     private var controls: some View {
         VStack(spacing: 8) {
@@ -133,37 +76,70 @@ struct MapView: View {
 
             HStack(spacing: 8) {
                 Image(systemName: locationService.isUsingFallbackCenter ? "location.slash" : "location.fill")
-                    .foregroundStyle(locationService.isUsingFallbackCenter ? AppColors.warning : AppColors.success)
+                    .foregroundStyle(locationService.isUsingFallbackCenter ? HBTheme.Colors.warning : HBTheme.Colors.success)
                 Text(locationService.centerLabel)
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
+                    .font(HBTheme.Font.caption)
+                    .foregroundStyle(HBTheme.Colors.textSecondary)
                 Spacer()
                 Text("\(filteredPins.count) repas")
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
+                    .font(HBTheme.Font.caption)
+                    .foregroundStyle(HBTheme.Colors.textSecondary)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.surface)
+        .background(HBTheme.Colors.surface)
     }
+
+    // MARK: - Selected Pin
+
+    private func selectedPinCard(pin: MealMapPin) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(pin.title)
+                    .font(HBTheme.Font.cardTitle)
+                    .foregroundStyle(HBTheme.Colors.text)
+                Spacer()
+                Text(pin.priceCents.asEuro())
+                    .font(HBTheme.Font.price)
+                    .foregroundStyle(HBTheme.Colors.primary)
+            }
+            Text(pin.subtitle)
+                .font(HBTheme.Font.caption)
+                .foregroundStyle(HBTheme.Colors.textSecondary)
+
+            NavigationLink {
+                MealDetailView(
+                    meal: pin.meal,
+                    functionsService: container.cloudFunctionsService
+                )
+            } label: {
+                Text("Voir les details")
+                    .font(HBTheme.Font.body(15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: HBTheme.Radius.button, style: .continuous)
+                            .fill(HBTheme.Colors.primary)
+                    )
+            }
+        }
+        .padding(12)
+        .background(HBTheme.Colors.surface)
+    }
+
+    // MARK: - Data
 
     private var filteredPins: [MealMapPin] {
         let center = locationService.centerCoordinate
         let centerLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
         let maxDistance = radiusKm * 1000
-
         let nearby = viewModel.pins.filter { pin in
-            let mealLocation = CLLocation(latitude: pin.latitude, longitude: pin.longitude)
-            return mealLocation.distance(from: centerLocation) <= maxDistance
+            let loc = CLLocation(latitude: pin.latitude, longitude: pin.longitude)
+            return loc.distance(from: centerLocation) <= maxDistance
         }
-
-        if !nearby.isEmpty {
-            return nearby
-        }
-
-        // Fallback UX: if no pin in radius, still show all pins so map is never empty.
-        return viewModel.pins
+        return nearby.isEmpty ? viewModel.pins : nearby
     }
 
     private func loadMap() async {
@@ -172,29 +148,8 @@ struct MapView: View {
         recenterMap()
     }
 
-    private func backfillLocationsDevOnly() async {
-        guard !isBackfillingLocations else { return }
-        isBackfillingLocations = true
-        defer { isBackfillingLocations = false }
-
-        do {
-            let result = try await container.cloudFunctionsService.backfillMealLocations(
-                onlyMine: true,
-                dryRun: false
-            )
-            #if DEBUG
-            NSLog("%@", "[Map][backfillMealLocations] processed=\(result.processedCount) updated=\(result.updatedCount)")
-            #endif
-            await viewModel.loadPins()
-            recenterMap()
-        } catch {
-            viewModel.errorMessage = error.localizedDescription
-        }
-    }
-
     private func recenterMap() {
         guard !filteredPins.isEmpty else { return }
-
         let center = locationService.centerCoordinate
         let region = MKCoordinateRegion(
             center: center,
@@ -203,6 +158,8 @@ struct MapView: View {
         cameraPosition = .region(region)
     }
 }
+
+// MARK: - Map Pin
 
 private struct MealMapPin: Identifiable, Hashable {
     let id: String
@@ -217,14 +174,11 @@ private struct MealMapPin: Identifiable, Hashable {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
-    static func == (lhs: MealMapPin, rhs: MealMapPin) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
+    static func == (lhs: MealMapPin, rhs: MealMapPin) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
+
+// MARK: - Map ViewModel
 
 @MainActor
 private final class MapViewModel: ObservableObject {
@@ -235,60 +189,32 @@ private final class MapViewModel: ObservableObject {
     private lazy var db = Firestore.firestore()
 
     func loadPins() async {
-        #if DEBUG
-        NSLog("🔄 [MapViewModel] Starting to load map pins...")
-        #endif
-
         isLoading = true
         defer { isLoading = false }
 
         do {
             let snapshot = try await db.collection("meals").getDocumentsAsync()
-
-            #if DEBUG
-            NSLog("✅ [MapViewModel] Fetched \(snapshot.documents.count) meal documents from Firestore")
-            #endif
-
             let parsed: [MealMapPin] = snapshot.documents.compactMap { document in
                 let data = document.data()
                 guard let coordinate = Self.coordinate(from: data),
-                      var meal = try? document.data(as: Meal.self) else {
-                    #if DEBUG
-                    NSLog("⚠️ [MapViewModel] Skipping document \(document.documentID) - no valid coordinates or failed to decode")
-                    #endif
-                    return nil
-                }
-
-                if meal.id.isEmpty {
-                    meal.id = document.documentID
-                }
-
+                      var meal = try? document.data(as: Meal.self) else { return nil }
+                if meal.id.isEmpty { meal.id = document.documentID }
                 let locationName = (data["locationName"] as? String)
                     ?? (data["addressApprox"] as? String)
                     ?? (data["city"] as? String)
-                    ?? "Location non precisee"
-
+                    ?? "Localisation inconnue"
                 return MealMapPin(
                     id: document.documentID,
                     meal: meal,
                     title: meal.title,
-                    subtitle: "\(locationName) • Host: \(meal.hostName)",
+                    subtitle: "\(locationName) · \(meal.hostName)",
                     priceCents: meal.priceCents,
                     latitude: coordinate.latitude,
                     longitude: coordinate.longitude
                 )
             }
             pins = parsed
-
-            #if DEBUG
-            NSLog("✅ [MapViewModel] Successfully parsed \(pins.count) pins with valid coordinates")
-            #endif
         } catch {
-            let nsError = error as NSError
-            #if DEBUG
-            NSLog("❌ [MapViewModel] Failed to load pins")
-            NSLog("❌ [MapViewModel] Error: \(nsError.localizedDescription)")
-            #endif
             errorMessage = error.localizedDescription
         }
     }
@@ -297,40 +223,38 @@ private final class MapViewModel: ObservableObject {
         if let location = data["location"] as? GeoPoint {
             return CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
         }
-
         if let geoPoint = data["geoPoint"] as? GeoPoint {
             return CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
         }
-
         if let lat = number(from: data["latitude"]),
            let lng = number(from: data["longitude"]) {
             return CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
-
-        if let coordinates = data["coordinates"] as? [String: Any],
-           let lat = number(from: coordinates["lat"] ?? coordinates["latitude"]),
-           let lng = number(from: coordinates["lng"] ?? coordinates["longitude"]) {
+        if let coords = data["coordinates"] as? [String: Any],
+           let lat = number(from: coords["lat"] ?? coords["latitude"]),
+           let lng = number(from: coords["lng"] ?? coords["longitude"]) {
             return CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
-
         return nil
     }
 
     private static func number(from value: Any?) -> Double? {
-        if let double = value as? Double { return double }
-        if let int = value as? Int { return Double(int) }
-        if let number = value as? NSNumber { return number.doubleValue }
-        if let string = value as? String { return Double(string) }
+        if let d = value as? Double { return d }
+        if let i = value as? Int { return Double(i) }
+        if let n = value as? NSNumber { return n.doubleValue }
+        if let s = value as? String { return Double(s) }
         return nil
     }
 }
+
+// MARK: - Location Service
 
 @MainActor
 private final class MapLocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var centerCoordinate: CLLocationCoordinate2D
     @Published var isUsingFallbackCenter = true
 
-    private let fallbackCoordinate = CLLocationCoordinate2D(latitude: 52.3676, longitude: 4.9041)
+    private let fallback = CLLocationCoordinate2D(latitude: 52.3676, longitude: 4.9041)
     private let locationManager = CLLocationManager()
 
     override init() {
@@ -341,7 +265,7 @@ private final class MapLocationService: NSObject, ObservableObject, CLLocationMa
     }
 
     var centerLabel: String {
-        isUsingFallbackCenter ? "Centre: Amsterdam (fallback)" : "Centre: position actuelle"
+        isUsingFallbackCenter ? "Centre : Amsterdam (fallback)" : "Centre : position actuelle"
     }
 
     var centerCoordinateToken: String {
@@ -349,30 +273,20 @@ private final class MapLocationService: NSObject, ObservableObject, CLLocationMa
     }
 
     func requestWhenInUseLocation() {
-        let status = locationManager.authorizationStatus
-        switch status {
-        case .notDetermined:
-            locationManager.requestWhenInUseAuthorization()
-        case .authorizedWhenInUse, .authorizedAlways:
-            locationManager.requestLocation()
-        case .restricted, .denied:
-            useFallbackCenter()
-        @unknown default:
-            useFallbackCenter()
+        switch locationManager.authorizationStatus {
+        case .notDetermined: locationManager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways: locationManager.requestLocation()
+        default: useFallback()
         }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        Task { @MainActor in
-            self.requestWhenInUseLocation()
-        }
+        Task { @MainActor in self.requestWhenInUseLocation() }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else {
-            Task { @MainActor in
-                self.useFallbackCenter()
-            }
+            Task { @MainActor in self.useFallback() }
             return
         }
         Task { @MainActor in
@@ -382,16 +296,11 @@ private final class MapLocationService: NSObject, ObservableObject, CLLocationMa
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        #if DEBUG
-        NSLog("%@", "[MapLocation] didFailWithError: \(error.localizedDescription)")
-        #endif
-        Task { @MainActor in
-            self.useFallbackCenter()
-        }
+        Task { @MainActor in self.useFallback() }
     }
 
-    private func useFallbackCenter() {
-        centerCoordinate = fallbackCoordinate
+    private func useFallback() {
+        centerCoordinate = fallback
         isUsingFallbackCenter = true
     }
 }

@@ -6,29 +6,34 @@ struct OrdersView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            LazyVStack(spacing: HBTheme.Spacing.m) {
                 if viewModel.orders.isEmpty {
-                    ContentUnavailableView(
-                        "Aucune commande",
-                        systemImage: "cart.badge.questionmark",
-                        description: Text("Vos commandes apparaîtront ici après paiement.")
-                    )
-                    .padding(.top, 100)
+                    VStack(spacing: 12) {
+                        Image(systemName: "bag")
+                            .font(.system(size: 40, weight: .light))
+                            .foregroundStyle(HBTheme.Colors.textSecondary.opacity(0.5))
+                        Text("Aucune commande")
+                            .font(HBTheme.Font.title(22))
+                            .foregroundStyle(HBTheme.Colors.text)
+                        Text("Tes commandes apparaitront ici apres paiement.")
+                            .font(HBTheme.Font.body(14))
+                            .foregroundStyle(HBTheme.Colors.textSecondary)
+                    }
+                    .padding(.top, 80)
                 } else {
                     ForEach(viewModel.orders) { order in
-                        OrderRowView(order: order)
+                        OrderRow(order: order)
                     }
-                    .padding(.horizontal, 20)
                 }
             }
-            .padding(.vertical, 16)
+            .padding(.horizontal, HBTheme.Spacing.screen)
+            .padding(.vertical, HBTheme.Spacing.m)
         }
-        .background(AppColors.cream)
+        .hbBackground()
         .navigationTitle("Mes commandes")
         .task {
             guard let uid = session.appUser?.id else { return }
             viewModel.startListening(clientId: uid)
-
             if viewModel.orders.isEmpty {
                 await viewModel.refresh(clientId: uid)
             }
@@ -46,78 +51,5 @@ struct OrdersView: View {
             actions: { Button("OK", role: .cancel) {} },
             message: { Text(viewModel.errorMessage ?? "") }
         )
-    }
-}
-
-private struct OrderRowView: View {
-    let order: Order
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header: Order ID & Price
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Commande #\(order.id?.prefix(8) ?? "--------")")
-                        .font(.cormorantDisplay(20, weight: .semibold))
-                        .foregroundStyle(AppColors.charcoal)
-                    Text("Portions: \(order.portions)")
-                        .font(.labelMedium)
-                        .foregroundStyle(AppColors.textSecondary)
-                }
-
-                Spacer()
-
-                Text(order.amountCents.asEuro())
-                    .font(.dmSans(22, weight: .bold))
-                    .foregroundStyle(AppColors.terracotta)
-            }
-
-            Divider()
-
-            // Status Row
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Statut de la commande")
-                        .font(.labelMedium)
-                        .foregroundStyle(AppColors.textSecondary)
-                    Text(order.status.displayTitle)
-                        .font(.dmSans(15, weight: .semibold))
-                        .foregroundStyle(statusColor)
-                }
-
-                Spacer()
-
-                paymentBadge
-            }
-        }
-        .padding(16)
-        .appCard()
-    }
-
-    private var paymentBadge: some View {
-        Text(order.paymentStatus.displayTitle)
-            .font(.labelMedium)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(colorForPayment.opacity(0.2), in: Capsule())
-            .foregroundStyle(colorForPayment)
-    }
-
-    private var statusColor: Color {
-        switch order.status {
-        case .pending: return AppColors.warning
-        case .confirmed: return Color(hex: "4A90E2")
-        case .cancelled: return AppColors.textSecondary
-        case .rejected: return AppColors.danger
-        }
-    }
-
-    private var colorForPayment: Color {
-        switch order.paymentStatus {
-        case .requires_payment: return AppColors.warning
-        case .paid: return AppColors.success
-        case .failed: return AppColors.danger
-        case .refunded: return .purple
-        }
     }
 }

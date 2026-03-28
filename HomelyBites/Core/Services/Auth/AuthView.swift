@@ -14,7 +14,7 @@ struct AuthView: View {
                 VStack(spacing: 0) {
                     onboardingHero
 
-                    VStack(spacing: HBMetrics.Spacing.m) {
+                    VStack(spacing: HBTheme.Spacing.m) {
                         Picker("Mode", selection: $viewModel.mode) {
                             ForEach(AuthViewModel.Mode.allCases) { mode in
                                 Text(mode.title).tag(mode)
@@ -35,12 +35,12 @@ struct AuthView: View {
                             .pickerStyle(.segmented)
                             .padding(6)
                             .background(
-                                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
-                                    .fill(HBColors.warmWhite)
+                                RoundedRectangle(cornerRadius: HBTheme.Radius.input, style: .continuous)
+                                    .fill(HBTheme.Colors.surface)
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
-                                    .stroke(HBColors.border, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: HBTheme.Radius.input, style: .continuous)
+                                    .stroke(HBTheme.Colors.border, lineWidth: 1)
                             )
                         }
 
@@ -57,12 +57,10 @@ struct AuthView: View {
                             HStack {
                                 Spacer()
                                 Button("Mot de passe oublie ?") {
-                                    Task {
-                                        await viewModel.sendPasswordReset()
-                                    }
+                                    Task { await viewModel.sendPasswordReset() }
                                 }
-                                .font(HBTypography.label(size: 13, weight: .semibold))
-                                .foregroundStyle(HBColors.terracotta)
+                                .font(HBTheme.Font.label(13, weight: .semibold))
+                                .foregroundStyle(HBTheme.Colors.primary)
                                 .disabled(viewModel.isLoading)
                             }
                         }
@@ -72,41 +70,37 @@ struct AuthView: View {
                             isLoading: viewModel.isLoading,
                             isDisabled: viewModel.isLoading
                         ) {
-                            Task {
-                                await viewModel.submit()
-                            }
+                            Task { await viewModel.submit() }
                         }
 
                         SecondaryButton(title: "Continuer avec Google", icon: "globe") {
-                            Task {
-                                await signInWithGoogleTapped()
-                            }
+                            Task { await signInWithGoogleTapped() }
                         }
                         .disabled(viewModel.isLoading)
 
                         if let infoMessage = viewModel.infoMessage {
-                            HStack(spacing: HBMetrics.Spacing.xs) {
+                            HStack(spacing: HBTheme.Spacing.xs) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(HBColors.success)
+                                    .foregroundStyle(HBTheme.Colors.success)
                                 Text(infoMessage)
-                                    .font(HBTypography.label(size: 12))
-                                    .foregroundStyle(HBColors.success)
+                                    .font(HBTheme.Font.label(12))
+                                    .foregroundStyle(HBTheme.Colors.success)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .padding(HBMetrics.horizontalPadding)
-                    .padding(.top, HBMetrics.Spacing.l)
-                    .padding(.bottom, HBMetrics.Spacing.xl)
+                    .padding(HBTheme.Spacing.screen)
+                    .padding(.top, HBTheme.Spacing.l)
+                    .padding(.bottom, HBTheme.Spacing.xl)
                     .background(
-                        RoundedRectangle(cornerRadius: HBMetrics.Radius.card, style: .continuous)
-                            .fill(HBColors.cream)
+                        RoundedRectangle(cornerRadius: HBTheme.Radius.card, style: .continuous)
+                            .fill(HBTheme.Colors.background)
                             .ignoresSafeArea(edges: .bottom)
                     )
-                    .offset(y: -HBMetrics.Spacing.m)
+                    .offset(y: -HBTheme.Spacing.m)
                 }
             }
-            .background(HBColors.charcoal.ignoresSafeArea())
+            .background(HBTheme.Colors.text.ignoresSafeArea())
             .navigationBarHidden(true)
             .alert(
                 "Erreur",
@@ -114,59 +108,54 @@ struct AuthView: View {
                     get: { viewModel.errorMessage != nil },
                     set: { if !$0 { viewModel.errorMessage = nil } }
                 ),
-                actions: {
-                    Button("OK", role: .cancel) {}
-                },
-                message: {
-                    Text(viewModel.errorMessage ?? "")
-                }
+                actions: { Button("OK", role: .cancel) {} },
+                message: { Text(viewModel.errorMessage ?? "") }
             )
         }
     }
 
+    // MARK: - Hero
+
     private var onboardingHero: some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
-                colors: [HBColors.charcoal, HBColors.terracottaDark],
+                colors: [HBTheme.Colors.text, HBTheme.Colors.primaryDark],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
             Circle()
-                .fill(HBColors.terracotta.opacity(0.26))
+                .fill(HBTheme.Colors.primary.opacity(0.26))
                 .frame(width: 220, height: 220)
                 .offset(x: 120, y: -80)
 
             Circle()
-                .fill(HBColors.sage.opacity(0.22))
+                .fill(HBTheme.Colors.sage.opacity(0.22))
                 .frame(width: 180, height: 180)
                 .offset(x: -80, y: 90)
 
-            VStack(alignment: .leading, spacing: HBMetrics.Spacing.s) {
-                HStack(spacing: HBMetrics.Spacing.s) {
-                    Text("🍽️")
-                        .font(.system(size: 30))
-                    Text("HomelyBites")
-                        .font(HBTypography.display(size: 42))
-                        .foregroundStyle(.white)
-                }
+            VStack(alignment: .leading, spacing: HBTheme.Spacing.s) {
+                Text("HomelyBites")
+                    .font(HBTheme.Font.display(42))
+                    .foregroundStyle(.white)
 
                 Text("Repas faits maison, en toute confiance")
-                    .font(HBTypography.body(size: 16, weight: .medium))
+                    .font(HBTheme.Font.body(16, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.88))
             }
-            .padding(HBMetrics.horizontalPadding)
-            .padding(.bottom, HBMetrics.Spacing.xl)
+            .padding(HBTheme.Spacing.screen)
+            .padding(.bottom, HBTheme.Spacing.xl)
         }
         .frame(height: 280)
     }
 
+    // MARK: - Google Sign-In
+
     private func signInWithGoogleTapped() async {
         guard let presenting = rootViewController() else {
-            viewModel.errorMessage = "Impossible d'ouvrir Google Sign-In. Reessaie."
+            viewModel.errorMessage = "Impossible d'ouvrir Google Sign-In."
             return
         }
-
         await viewModel.signInWithGoogle(presenting: presenting)
     }
 
@@ -186,29 +175,12 @@ private extension UIViewController {
         if let presentedViewController = presentedViewController {
             return presentedViewController.hbTopMostViewController()
         }
-        if let navigationController = self as? UINavigationController {
-            return navigationController.visibleViewController?.hbTopMostViewController() ?? navigationController
+        if let nav = self as? UINavigationController {
+            return nav.visibleViewController?.hbTopMostViewController() ?? nav
         }
-        if let tabBarController = self as? UITabBarController {
-            return tabBarController.selectedViewController?.hbTopMostViewController() ?? tabBarController
+        if let tab = self as? UITabBarController {
+            return tab.selectedViewController?.hbTopMostViewController() ?? tab
         }
         return self
-    }
-}
-
-private extension View {
-    func hbInputStyle() -> some View {
-        self
-            .font(HBTypography.body(size: 15))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
-                    .fill(HBColors.warmWhite)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: HBMetrics.Radius.input, style: .continuous)
-                    .stroke(HBColors.border, lineWidth: 1)
-            )
     }
 }

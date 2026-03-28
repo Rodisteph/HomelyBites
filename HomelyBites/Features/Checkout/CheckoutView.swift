@@ -25,7 +25,7 @@ struct CheckoutView: View {
 
     var body: some View {
         ZStack {
-            AppColors.cream.ignoresSafeArea()
+            HBTheme.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 24) {
                 Spacer()
@@ -33,42 +33,42 @@ struct CheckoutView: View {
                 VStack(spacing: 10) {
                     BrandLogoView(size: 62)
                     Text("Confirmer le paiement")
-                        .font(.cormorantDisplay(30, weight: .semibold))
-                        .foregroundStyle(AppColors.charcoal)
-                    Text("Order #\(viewModel.orderId.prefix(8))")
-                        .font(.dmSans(13, weight: .medium))
-                        .foregroundStyle(AppColors.muted)
+                        .font(HBTheme.Font.display(30))
+                        .foregroundStyle(HBTheme.Colors.text)
+                    Text("Commande #\(viewModel.orderId.prefix(8))")
+                        .font(HBTheme.Font.label())
+                        .foregroundStyle(HBTheme.Colors.textSecondary)
                 }
 
                 VStack(spacing: 8) {
                     Text(viewModel.itemLabel)
-                        .font(.dmSans(16, weight: .semibold))
-                        .foregroundStyle(AppColors.charcoal)
+                        .font(HBTheme.Font.body(16, weight: .semibold))
+                        .foregroundStyle(HBTheme.Colors.text)
                         .multilineTextAlignment(.center)
                     Text(viewModel.amountCents.asEuro())
-                        .font(.cormorantDisplay(36, weight: .semibold))
-                        .foregroundStyle(AppColors.primary)
+                        .font(HBTheme.Font.display(36))
+                        .foregroundStyle(HBTheme.Colors.primary)
                 }
 
                 if viewModel.isPreparing {
                     ProgressView()
-                        .tint(AppColors.primary)
+                        .tint(HBTheme.Colors.primary)
                 }
 
                 if let message = viewModel.statusMessage {
                     HStack(spacing: 10) {
                         Image(systemName: "clock.badge.checkmark")
-                            .foregroundStyle(AppColors.info)
+                            .foregroundStyle(HBTheme.Colors.info)
                         Text(message)
-                            .font(.dmSans(14, weight: .medium))
+                            .font(HBTheme.Font.body(14, weight: .medium))
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(AppColors.info.opacity(0.12))
+                        RoundedRectangle(cornerRadius: HBTheme.Radius.button, style: .continuous)
+                            .fill(HBTheme.Colors.info.opacity(0.12))
                     )
-                    .padding(.horizontal, AppMetrics.horizontalPadding)
+                    .padding(.horizontal, HBTheme.Spacing.screen)
                 }
 
                 Spacer()
@@ -80,18 +80,15 @@ struct CheckoutView: View {
                         isLoading: viewModel.isPreparing,
                         isDisabled: viewModel.isPreparing || viewModel.paymentSucceeded || viewModel.isAwaitingConfirmation
                     ) {
-                        Task {
-                            await viewModel.preparePaymentSheet()
-                        }
+                        Task { await viewModel.preparePaymentSheet() }
                     }
-                    .padding(.horizontal, AppMetrics.horizontalPadding)
+                    .padding(.horizontal, HBTheme.Spacing.screen)
 
-                    Button("Annuler") {
+                    SecondaryButton(title: "Annuler") {
                         dismiss()
                     }
-                    .buttonStyle(SecondaryButtonStyle())
                     .disabled(viewModel.isPreparing || viewModel.isAwaitingConfirmation)
-                    .padding(.horizontal, AppMetrics.horizontalPadding)
+                    .padding(.horizontal, HBTheme.Spacing.screen)
                 }
                 .padding(.bottom, 32)
             }
@@ -112,12 +109,10 @@ struct CheckoutView: View {
             guard succeeded, !hasCompleted else { return }
             hasCompleted = true
             onPaymentCompleted()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                dismiss()
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
         }
         .alert(
-            "Payment Error",
+            "Erreur de paiement",
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }

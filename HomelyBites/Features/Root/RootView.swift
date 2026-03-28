@@ -14,19 +14,15 @@ struct RootView: View {
                 AuthView(authService: container.authService)
             }
         }
-        .background(AppColors.cream.ignoresSafeArea())
+        .hbBackground()
         .alert(
             "Erreur",
             isPresented: Binding(
                 get: { session.globalErrorMessage != nil },
                 set: { if !$0 { session.globalErrorMessage = nil } }
             ),
-            actions: {
-                Button("OK", role: .cancel) {}
-            },
-            message: {
-                Text(session.globalErrorMessage ?? "")
-            }
+            actions: { Button("OK", role: .cancel) {} },
+            message: { Text(session.globalErrorMessage ?? "") }
         )
     }
 
@@ -39,19 +35,12 @@ struct RootView: View {
                 Label("Repas", systemImage: "fork.knife")
             }
 
-            NavigationStack {
-                MapView()
-            }
-            .tabItem {
-                Label("Map", systemImage: "map")
-            }
-
             if session.appUser?.role == .client {
                 NavigationStack {
                     OrdersView()
                 }
                 .tabItem {
-                    Label("Commandes", systemImage: "cart")
+                    Label("Commandes", systemImage: "bag")
                 }
             }
 
@@ -63,7 +52,7 @@ struct RootView: View {
                     )
                 }
                 .tabItem {
-                    Label("Host", systemImage: "house")
+                    Label("Dashboard", systemImage: "chart.bar")
                 }
             }
 
@@ -73,54 +62,44 @@ struct RootView: View {
             .tabItem {
                 Label("Profil", systemImage: "person.crop.circle")
             }
-
-            NavigationStack {
-                SettingsView()
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gear")
-            }
         }
-        .tint(AppColors.terracotta)
+        .tint(HBTheme.Colors.primary)
     }
 }
 
 // MARK: - Splash View
+
 private struct SplashView: View {
     @State private var scale: CGFloat = 0.8
     @State private var opacity: Double = 0
 
     var body: some View {
         ZStack {
-            // Background Gradient
             LinearGradient(
-                colors: [AppColors.cream, AppColors.creamDark],
+                colors: [HBTheme.Colors.background, HBTheme.Colors.border],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                // Brand Logo with Animation
                 BrandLogoView(size: 120)
                     .scaleEffect(scale)
                     .opacity(opacity)
 
-                // Brand Name
                 VStack(spacing: 8) {
                     Text("HomelyBites")
-                        .font(.cormorantDisplay(42, weight: .semibold))
-                        .foregroundStyle(AppColors.charcoal)
+                        .font(HBTheme.Font.display(42))
+                        .foregroundStyle(HBTheme.Colors.text)
 
                     Text("Cuisine locale, faite maison")
-                        .font(.bodyLarge)
-                        .foregroundStyle(AppColors.textSecondary)
+                        .font(HBTheme.Font.body())
+                        .foregroundStyle(HBTheme.Colors.textSecondary)
                 }
                 .opacity(opacity)
 
-                // Loading Indicator
                 ProgressView()
-                    .tint(AppColors.terracotta)
+                    .tint(HBTheme.Colors.primary)
                     .scaleEffect(1.2)
                     .padding(.top, 20)
                     .opacity(opacity)
