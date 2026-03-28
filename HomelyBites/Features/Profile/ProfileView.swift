@@ -234,7 +234,9 @@ struct ProfileView: View {
         CardContainer {
             Text("Legal").hbTitle()
 
-            Link(destination: AppConfig.privacyPolicyURL) {
+            NavigationLink {
+                PrivacyPolicyView()
+            } label: {
                 HStack {
                     Text("Politique de confidentialite")
                         .font(HBTheme.Font.body(15))
@@ -246,7 +248,9 @@ struct ProfileView: View {
                 }
             }
 
-            Link(destination: AppConfig.termsOfUseURL) {
+            NavigationLink {
+                TermsOfServiceView()
+            } label: {
                 HStack {
                     Text("Conditions d'utilisation")
                         .font(HBTheme.Font.body(15))

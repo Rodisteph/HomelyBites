@@ -4,6 +4,7 @@ struct MealDetailView: View {
     @EnvironmentObject private var session: SessionViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: MealDetailViewModel
+    @State private var showReportSheet = false
 
     init(
         meal: Meal,
@@ -139,6 +140,12 @@ struct MealDetailView: View {
             actions: { Button("OK", role: .cancel) {} },
             message: { Text(viewModel.errorMessage ?? "") }
         )
+        .sheet(isPresented: $showReportSheet) {
+            ReportContentView(
+                contentType: .meal,
+                contentId: viewModel.meal.id
+            )
+        }
     }
 
     // MARK: - Hero
@@ -178,6 +185,13 @@ struct MealDetailView: View {
                             .background(.ultraThinMaterial, in: Circle())
                     }
                     Spacer()
+                    Button { showReportSheet = true } label: {
+                        Image(systemName: "flag")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
                     Badge(
                         label: (viewModel.meal.serviceMode ?? .onSite).displayTitle,
                         kind: .info

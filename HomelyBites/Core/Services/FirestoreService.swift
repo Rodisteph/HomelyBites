@@ -1,4 +1,5 @@
 import Foundation
+import FirebaseAuth
 import FirebaseFirestore
 
 final class FirestoreService {
@@ -307,6 +308,46 @@ final class FirestoreService {
                     onUpdate(.failure(error))
                 }
             }
+    }
+
+    // MARK: - Reports (UGC Moderation)
+
+    func submitReport(
+        contentType: ReportContentType,
+        contentId: String,
+        reason: ReportReason,
+        details: String
+    ) async throws {
+        guard let uid = FirebaseAuth.Auth.auth().currentUser?.uid else {
+            throw AppError.missingAuth
+        }
+
+        let data: [String: Any] = [
+            "contentType": contentType.rawValue,
+            "contentId": contentId,
+            "reason": reason.rawValue,
+            "details": details.trimmingCharacters(in: .whitespacesAndNewlines),
+            "reporterId": uid,
+            "status": "pending",
+            "createdAt": FieldValue.serverTimestamp()
+        ]
+
+        try await db.collection("reports").addDocument(data: data)
+    }
+
+    // MARK: - Account Deletion
+
+    func deleteUserData(uid: String) async throws {
+        // Delete user's meals
+        let mealsSnapshot = try await db.collection("meals")
+            .whereField("hostId", isEqualTo: uid)
+            .getDocumentsAsync()
+        for doc in mealsSnapshot.documents {
+            try await doc.reference.deleteAsync()
+        }
+
+        // Delete user profile
+        try await db.collection("users").document(uid).deleteAsync()
     }
 
     private func debugLog(_ message: String) {

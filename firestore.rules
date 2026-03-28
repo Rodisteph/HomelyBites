@@ -91,5 +91,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidOrderCreate();
       allow update, delete: if false;
     }
+
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.contentType is string
+        && request.resource.data.contentId is string
+        && request.resource.data.reason is string;
+      allow read, update, delete: if false;
+    }
   }
 }
