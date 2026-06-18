@@ -1,46 +1,37 @@
 import SwiftUI
 
 struct MealDetailView: View {
-    @EnvironmentObject private var session: SessionViewModel
-    @StateObject private var viewModel: MealDetailViewModel
+    @Environment(SessionViewModel.self) private var session
+    @State private var viewModel: MealDetailViewModel
 
     init(meal: Meal) {
-        _viewModel = StateObject(wrappedValue: MealDetailViewModel(meal: meal))
+        _viewModel = State(initialValue: MealDetailViewModel(meal: meal))
     }
 
     var body: some View {
         Form {
             Section("Repas") {
-                Text(viewModel.meal.title)
-                    .font(.title3.weight(.bold))
+                Text(viewModel.meal.title).font(.title3.weight(.bold))
                 Text(viewModel.meal.description)
-                HStack {
-                    Text("Host")
-                    Spacer()
-                    Text(viewModel.meal.hostName)
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Prix unitaire")
-                    Spacer()
-                    Text(viewModel.meal.priceCents.asEuro())
-                        .foregroundStyle(.secondary)
-                }
+                row("Host", value: viewModel.meal.hostName)
+                row("Prix unitaire", value: viewModel.meal.priceCents.asEuro())
             }
 
             Section("Reservation") {
-                Stepper("Portions: \(viewModel.portions)", value: $viewModel.portions, in: 1...max(1, viewModel.meal.availablePortions))
-
-                Text("Total: \(viewModel.totalPriceCents.asEuro())")
-                    .font(.headline)
-
+                Stepper(
+                    "Portions : \(viewModel.portions)",
+                    value: $viewModel.portions,
+                    in: 1...max(1, viewModel.meal.availablePortions)
+                )
+                Text("Total : \(viewModel.totalPriceCents.asEuro())").font(.headline)
                 TextField("Note (optionnelle)", text: $viewModel.note, axis: .vertical)
                     .lineLimit(3, reservesSpace: true)
             }
 
             if viewModel.confirmationInProgress {
                 Section {
-                    Label("Confirmation en cours... verifie l'onglet Commandes.", systemImage: "clock.badge.checkmark")
+                    Label("Confirmation en cours... verifie l'onglet Commandes.",
+                          systemImage: "clock.badge.checkmark")
                         .foregroundStyle(.orange)
                 }
             }
@@ -51,44 +42,31 @@ struct MealDetailView: View {
                         viewModel.errorMessage = AppError.missingAuth.localizedDescription
                         return
                     }
-                    Task {
-                        await viewModel.reserveAndPay(clientId: clientId)
-                    }
+                    Task { await viewModel.reserveAndPay(clientId: clientId) }
                 } label: {
-                    if viewModel.isLoading {
-                        ProgressView()
-                    } else {
-                        Text("Reserver & payer")
-                    }
+                    if viewModel.isLoading { ProgressView() }
+                    else { Text("Reserver & payer") }
                 }
                 .disabled(viewModel.isLoading)
             }
         }
         .navigationTitle("Detail")
-        .sheet(
-            isPresented: Binding(
-                get: { viewModel.createdOrderId != nil },
-                set: { if !$0 { viewModel.createdOrderId = nil } }
-            )
-        ) {
+        .sheet(isPresented: Binding(
+            get:  { viewModel.createdOrderId != nil },
+            set:  { if !$0 { viewModel.createdOrderId = nil } }
+        )) {
             if let orderId = viewModel.createdOrderId {
-                CheckoutView(orderId: orderId) {
-                    viewModel.paymentDidComplete()
-                }
+                CheckoutView(orderId: orderId) { viewModel.paymentDidComplete() }
             }
         }
-        .alert(
-            "Erreur",
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            ),
-            actions: {
-                Button("OK", role: .cancel) {}
-            },
-            message: {
-                Text(viewModel.errorMessage ?? "")
-            }
-        )
+        .errorAlert(message: $viewModel.errorMessage)
+    }
+
+    private func row(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value).foregroundStyle(.secondary)
+        }
     }
 }

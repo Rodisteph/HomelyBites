@@ -9,7 +9,7 @@ enum UserRole: String, Codable, CaseIterable, Identifiable {
     var displayTitle: String {
         switch self {
         case .client: return "Client"
-        case .host: return "Host"
+        case .host:   return "Host"
         }
     }
 }

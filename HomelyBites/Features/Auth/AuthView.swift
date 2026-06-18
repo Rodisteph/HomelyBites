@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AuthView: View {
-    @StateObject private var viewModel = AuthViewModel()
+    @State private var viewModel = AuthViewModel()
 
     var body: some View {
         NavigationStack {
@@ -16,7 +16,6 @@ struct AuthView: View {
                 if viewModel.mode == .signUp {
                     TextField("Nom complet", text: $viewModel.fullName)
                         .textInputAutocapitalization(.words)
-
                     Picker("Role", selection: $viewModel.selectedRole) {
                         ForEach(UserRole.allCases) { role in
                             Text(role.displayTitle).tag(role)
@@ -27,20 +26,15 @@ struct AuthView: View {
                 TextField("Email", text: $viewModel.email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled(true)
+                    .autocorrectionDisabled()
 
                 SecureField("Mot de passe", text: $viewModel.password)
 
                 Button {
-                    Task {
-                        await viewModel.submit()
-                    }
+                    Task { await viewModel.submit() }
                 } label: {
                     if viewModel.isLoading {
-                        HStack {
-                            ProgressView()
-                            Text("Veuillez patienter...")
-                        }
+                        HStack { ProgressView(); Text("Veuillez patienter...") }
                     } else {
                         Text(viewModel.mode.actionTitle)
                     }
@@ -48,19 +42,7 @@ struct AuthView: View {
                 .disabled(viewModel.isLoading)
             }
             .navigationTitle("HomelyBites")
-            .alert(
-                "Erreur",
-                isPresented: Binding(
-                    get: { viewModel.errorMessage != nil },
-                    set: { if !$0 { viewModel.errorMessage = nil } }
-                ),
-                actions: {
-                    Button("OK", role: .cancel) {}
-                },
-                message: {
-                    Text(viewModel.errorMessage ?? "")
-                }
-            )
+            .errorAlert(message: $viewModel.errorMessage)
         }
     }
 }

@@ -1,81 +1,39 @@
 import SwiftUI
 
 struct HostDashboardView: View {
-    @EnvironmentObject private var session: SessionViewModel
-    @StateObject private var viewModel = HostDashboardViewModel()
+    @Environment(SessionViewModel.self) private var session
+    @State private var viewModel = HostDashboardViewModel()
 
     var body: some View {
         List {
             if let user = session.appUser {
                 Section("Paiements") {
-                    HStack {
-                        Text("Stripe status")
-                        Spacer()
-                        Text(user.isStripeReady ? "Onboarded" : "Not ready")
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(user.isStripeReady ? Color.green.opacity(0.2) : Color.orange.opacity(0.2), in: Capsule())
-                            .foregroundStyle(user.isStripeReady ? .green : .orange)
-                    }
-
-                    Button {
-                        Task {
-                            await viewModel.activatePayments()
-                        }
-                    } label: {
-                        if viewModel.isActivatingPayments {
-                            HStack {
-                                ProgressView()
-                                Text("Ouverture Stripe...")
-                            }
-                        } else {
-                            Text("Activer paiements")
-                        }
-                    }
-
+                    stripeStatusRow(user: user)
+                    activatePaymentsButton
                     Button("Rafraichir profil Stripe") {
-                        Task {
-                            await session.refreshUserProfile()
-                        }
+                        Task { await session.refreshUserProfile() }
                     }
                 }
 
-                Section("Meals") {
-                    Button("Creer meal") {
-                        viewModel.showingCreateMeal = true
+                Section("Repas") {
+                    Button("Creer un repas") { viewModel.showingCreateMeal = true }
+                    Button("Seed 2 repas de test") {
+                        Task { await viewModel.seedMeals(host: user) }
                     }
-
-                    Button("Seed 2 meals de test") {
-                        Task {
-                            await viewModel.seedMeals(host: user)
-                        }
-                    }
-
-                    if let successMessage = viewModel.successMessage {
-                        Text(successMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.green)
+                    if let msg = viewModel.successMessage {
+                        Text(msg).font(.footnote).foregroundStyle(.green)
                     }
                 }
             }
 
             Section("Commandes recues") {
                 if viewModel.receivedOrders.isEmpty {
-                    Text("Aucune commande pour le moment.")
-                        .foregroundStyle(.secondary)
+                    Text("Aucune commande pour le moment.").foregroundStyle(.secondary)
                 } else {
                     ForEach(viewModel.receivedOrders) { order in
-                        HostOrderRow(
-                            order: order,
-                            onConfirm: {
-                                guard let orderId = order.id else { return }
-                                Task { await viewModel.updateOrderStatus(orderId: orderId, status: .confirmed) }
-                            },
-                            onReject: {
-                                guard let orderId = order.id else { return }
-                                Task { await viewModel.updateOrderStatus(orderId: orderId, status: .rejected) }
-                            }
+                        HostOrderRow(order: order,
+                            onConfirm: { Task { await viewModel.updateOrderStatus(orderId: order.id, status: .confirmed) } },
+                            onReject:  { Task { await viewModel.updateOrderStatus(orderId: order.id, status: .rejected) } }
                         )
                     }
                 }
@@ -85,9 +43,7 @@ struct HostDashboardView: View {
         .task {
             guard let hostId = session.appUser?.id else { return }
             viewModel.startListening(hostId: hostId)
-            if viewModel.receivedOrders.isEmpty {
-                await viewModel.refresh(hostId: hostId)
-            }
+            if viewModel.receivedOrders.isEmpty { await viewModel.refresh(hostId: hostId) }
         }
         .refreshable {
             guard let hostId = session.appUser?.id else { return }
@@ -95,33 +51,39 @@ struct HostDashboardView: View {
             await session.refreshUserProfile()
         }
         .sheet(isPresented: $viewModel.showingCreateMeal) {
-            if let user = session.appUser {
-                CreateMealView(host: user)
+            if let user = session.appUser { CreateMealView(host: user) }
+        }
+        .sheet(isPresented: Binding(
+            get:  { viewModel.onboardingURL != nil },
+            set:  { if !$0 { viewModel.onboardingURL = nil } }
+        )) {
+            if let url = viewModel.onboardingURL { SafariView(url: url) }
+        }
+        .errorAlert(message: $viewModel.errorMessage)
+    }
+
+    private func stripeStatusRow(user: AppUser) -> some View {
+        HStack {
+            Text("Stripe status")
+            Spacer()
+            Text(user.isStripeReady ? "Onboarde" : "Non pret")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(user.isStripeReady ? Color.green.opacity(0.2) : Color.orange.opacity(0.2), in: Capsule())
+                .foregroundStyle(user.isStripeReady ? .green : .orange)
+        }
+    }
+
+    private var activatePaymentsButton: some View {
+        Button {
+            Task { await viewModel.activatePayments() }
+        } label: {
+            if viewModel.isActivatingPayments {
+                HStack { ProgressView(); Text("Ouverture Stripe...") }
+            } else {
+                Text("Activer paiements")
             }
         }
-        .sheet(
-            isPresented: Binding(
-                get: { viewModel.onboardingURL != nil },
-                set: { if !$0 { viewModel.onboardingURL = nil } }
-            )
-        ) {
-            if let onboardingURL = viewModel.onboardingURL {
-                SafariView(url: onboardingURL)
-            }
-        }
-        .alert(
-            "Erreur",
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            ),
-            actions: {
-                Button("OK", role: .cancel) {}
-            },
-            message: {
-                Text(viewModel.errorMessage ?? "")
-            }
-        )
     }
 }
 
@@ -133,32 +95,20 @@ private struct HostOrderRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Order #\(order.id?.prefix(6) ?? "-")")
-                    .font(.headline)
+                Text("Commande #\(order.id.prefix(6))").font(.headline)
                 Spacer()
                 Text(order.amountCents.asEuro())
             }
-
-            Text("Payment: \(order.paymentStatus.displayTitle)")
-                .font(.subheadline)
-                .foregroundStyle(paymentColor)
+            Text("Paiement : \(order.paymentStatus.displayTitle)")
+                .font(.subheadline).foregroundStyle(paymentColor)
 
             if order.status == .pending {
                 HStack {
-                    Button("Confirmer") {
-                        onConfirm()
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button("Rejeter", role: .destructive) {
-                        onReject()
-                    }
-                    .buttonStyle(.bordered)
+                    Button("Confirmer", action: onConfirm).buttonStyle(.borderedProminent)
+                    Button("Rejeter", role: .destructive, action: onReject).buttonStyle(.bordered)
                 }
             } else {
-                Text("Status: \(order.status.displayTitle)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("Statut : \(order.status.displayTitle)").font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
@@ -166,14 +116,10 @@ private struct HostOrderRow: View {
 
     private var paymentColor: Color {
         switch order.paymentStatus {
-        case .requires_payment:
-            return .orange
-        case .paid:
-            return .green
-        case .failed:
-            return .red
-        case .refunded:
-            return .purple
+        case .requires_payment: return .orange
+        case .paid:             return .green
+        case .failed:           return .red
+        case .refunded:         return .purple
         }
     }
 }

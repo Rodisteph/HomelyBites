@@ -1,42 +1,37 @@
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-final class MealDetailViewModel: ObservableObject {
-    @Published var portions = 1
-    @Published var note = ""
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var createdOrderId: String?
-    @Published var confirmationInProgress = false
+final class MealDetailViewModel {
+    var portions = 1
+    var note = ""
+    var isLoading = false
+    var errorMessage: String?
+    var createdOrderId: String?
+    var confirmationInProgress = false
 
     let meal: Meal
+    private let service = FirestoreService()
 
-    private let firestoreService = FirestoreService()
+    init(meal: Meal) { self.meal = meal }
 
-    init(meal: Meal) {
-        self.meal = meal
-    }
+    var totalPriceCents: Int { meal.priceCents * portions }
 
     func reserveAndPay(clientId: String) async {
         isLoading = true
         defer { isLoading = false }
-
         do {
-            let hostProfile = try await firestoreService.fetchUser(uid: meal.hostId)
-            guard let stripeAccountId = hostProfile.stripeAccountId,
-                  hostProfile.stripeOnboarded == true else {
+            let host = try await service.fetchUser(uid: meal.hostId)
+            guard let stripeId = host.stripeAccountId, host.stripeOnboarded == true else {
                 throw AppError.hostPaymentsNotReady
             }
-
-            let orderId = try await firestoreService.createOrder(
-                meal: meal,
-                clientId: clientId,
-                hostStripeAccountId: stripeAccountId,
+            createdOrderId = try await service.createOrder(
+                meal: meal, clientId: clientId,
+                hostStripeAccountId: stripeId,
                 portions: portions,
                 note: note.trimmingCharacters(in: .whitespacesAndNewlines)
             )
-
-            createdOrderId = orderId
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -45,9 +40,5 @@ final class MealDetailViewModel: ObservableObject {
     func paymentDidComplete() {
         createdOrderId = nil
         confirmationInProgress = true
-    }
-
-    var totalPriceCents: Int {
-        meal.priceCents * portions
     }
 }

@@ -1,29 +1,26 @@
 import Foundation
+import Observation
 import FirebaseFirestore
 
+@Observable
 @MainActor
-final class OrdersViewModel: ObservableObject {
-    @Published var orders: [Order] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+final class OrdersViewModel {
+    var orders: [Order] = []
+    var isLoading = false
+    var errorMessage: String?
 
-    private let firestoreService = FirestoreService()
-    private var listener: ListenerRegistration?
+    private let service = FirestoreService()
+    @ObservationIgnored private var listener: ListenerRegistration?
 
-    deinit {
-        listener?.remove()
-    }
+    deinit { listener?.remove() }
 
     func startListening(clientId: String) {
         guard listener == nil else { return }
-
-        listener = firestoreService.listenClientOrders(clientId: clientId) { [weak self] result in
+        listener = service.listenClientOrders(clientId: clientId) { [weak self] result in
             Task { @MainActor in
                 switch result {
-                case .success(let orders):
-                    self?.orders = orders
-                case .failure(let error):
-                    self?.errorMessage = error.localizedDescription
+                case .success(let orders): self?.orders = orders
+                case .failure(let error):  self?.errorMessage = error.localizedDescription
                 }
             }
         }
@@ -32,11 +29,7 @@ final class OrdersViewModel: ObservableObject {
     func refresh(clientId: String) async {
         isLoading = true
         defer { isLoading = false }
-
-        do {
-            orders = try await firestoreService.fetchClientOrders(clientId: clientId)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        do { orders = try await service.fetchClientOrders(clientId: clientId) }
+        catch { errorMessage = error.localizedDescription }
     }
 }

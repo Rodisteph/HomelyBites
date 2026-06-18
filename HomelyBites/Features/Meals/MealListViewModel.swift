@@ -1,21 +1,19 @@
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-final class MealListViewModel: ObservableObject {
-    @Published var meals: [Meal] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+final class MealListViewModel {
+    var meals: [Meal] = []
+    var isLoading = false
+    var errorMessage: String?
 
-    private let firestoreService = FirestoreService()
+    private let service = FirestoreService()
 
     func loadMeals() async {
         isLoading = true
         defer { isLoading = false }
-
-        do {
-            meals = try await firestoreService.fetchMeals()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        do { meals = try await service.fetchMeals() }
+        catch { errorMessage = error.localizedDescription }
     }
 }

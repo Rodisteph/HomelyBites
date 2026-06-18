@@ -1,40 +1,36 @@
 import Foundation
+import Observation
 import StripePaymentSheet
 
+@Observable
 @MainActor
-final class CheckoutViewModel: ObservableObject {
-    @Published var paymentSheet: PaymentSheet?
-    @Published var isPreparing = false
-    @Published var isPresentingPaymentSheet = false
-    @Published var statusMessage: String?
-    @Published var errorMessage: String?
+final class CheckoutViewModel {
+    var paymentSheet: PaymentSheet?
+    var isPreparing = false
+    var isPresentingPaymentSheet = false
+    var statusMessage: String?
+    var errorMessage: String?
 
     let orderId: String
+    private let service = CloudFunctionsService()
 
-    private let functionsService = CloudFunctionsService()
-
-    init(orderId: String) {
-        self.orderId = orderId
-    }
+    init(orderId: String) { self.orderId = orderId }
 
     func preparePaymentIfNeeded() async {
-        if paymentSheet != nil {
-            isPresentingPaymentSheet = true
-            return
-        }
+        if paymentSheet != nil { isPresentingPaymentSheet = true; return }
 
         isPreparing = true
         defer { isPreparing = false }
 
         do {
-            let clientSecret = try await functionsService.createPaymentIntentWithFee(orderId: orderId)
+            let clientSecret = try await service.createPaymentIntentWithFee(orderId: orderId)
 
-            var configuration = PaymentSheet.Configuration()
-            configuration.merchantDisplayName = "HomelyBites"
-            configuration.returnURL = "homelybites://stripe-redirect"
-            configuration.allowsDelayedPaymentMethods = false
+            var config = PaymentSheet.Configuration()
+            config.merchantDisplayName = "HomelyBites"
+            config.returnURL = "homelybites://stripe-redirect"
+            config.allowsDelayedPaymentMethods = false
 
-            paymentSheet = PaymentSheet(paymentIntentClientSecret: clientSecret, configuration: configuration)
+            paymentSheet = PaymentSheet(paymentIntentClientSecret: clientSecret, configuration: config)
             isPresentingPaymentSheet = true
         } catch {
             errorMessage = error.localizedDescription
@@ -43,12 +39,9 @@ final class CheckoutViewModel: ObservableObject {
 
     func handlePaymentResult(_ result: PaymentSheetResult) {
         switch result {
-        case .completed:
-            statusMessage = "Paiement envoye. Confirmation en cours via webhook Stripe."
-        case .canceled:
-            statusMessage = "Paiement annule."
-        case .failed(let error):
-            errorMessage = error.localizedDescription
+        case .completed: statusMessage = "Paiement envoye. Confirmation via webhook Stripe."
+        case .canceled:  statusMessage = "Paiement annule."
+        case .failed(let error): errorMessage = error.localizedDescription
         }
     }
 }

@@ -1,34 +1,30 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject private var session: SessionViewModel
+    @Environment(SessionViewModel.self) private var session
 
     var body: some View {
         Form {
             if let user = session.appUser {
                 Section("Mon profil") {
-                    HStack {
-                        Text("Nom")
-                        Spacer()
-                        Text(user.fullName)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Text("Role")
-                        Spacer()
-                        Text(user.role.displayTitle)
-                            .foregroundStyle(.secondary)
-                    }
+                    row("Nom", value: user.fullName)
+                    row("Role", value: user.role.displayTitle)
                 }
             }
-
             Section {
                 Button("Se deconnecter", role: .destructive) {
                     session.signOut()
                 }
             }
         }
-        .navigationTitle("Settings")
+        .navigationTitle("Profil")
+    }
+
+    private func row(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value).foregroundStyle(.secondary)
+        }
     }
 }

@@ -1,23 +1,23 @@
 import SwiftUI
+import FirebaseCore
 import StripeCore
 
 @main
 struct HomelyBitesApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var sessionViewModel = SessionViewModel()
+
+    @State private var session = SessionViewModel()
 
     init() {
+        FirebaseApp.configure()
         StripeInitializer.configure()
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(sessionViewModel)
+                .environment(session)
                 .onOpenURL { url in
-                    Task {
-                        await sessionViewModel.handleIncomingDeepLink(url)
-                    }
+                    Task { await session.handleIncomingDeepLink(url) }
                 }
         }
     }

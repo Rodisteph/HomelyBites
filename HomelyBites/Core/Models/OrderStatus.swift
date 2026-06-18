@@ -7,8 +7,5 @@ enum OrderStatus: String, Codable, CaseIterable, Identifiable {
     case rejected
 
     var id: String { rawValue }
-
-    var displayTitle: String {
-        rawValue.capitalized
-    }
+    var displayTitle: String { rawValue.capitalized }
 }

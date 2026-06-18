@@ -4,7 +4,7 @@ import StripePayments
 enum StripeInitializer {
     static func configure() {
         let key = AppConfig.stripePublishableKey
-        if key.isEmpty {
+        guard !key.isEmpty else {
             assertionFailure(AppError.stripePublishableKeyMissing.localizedDescription)
             return
         }
