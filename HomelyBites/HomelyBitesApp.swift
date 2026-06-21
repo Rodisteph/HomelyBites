@@ -16,9 +16,6 @@ struct HomelyBitesApp: App {
         WindowGroup {
             RootView()
                 .environment(session)
-                .onOpenURL { url in
-                    Task { await session.handleIncomingDeepLink(url) }
-                }
         }
     }
 }

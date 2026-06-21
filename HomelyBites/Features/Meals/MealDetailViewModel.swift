@@ -22,13 +22,9 @@ final class MealDetailViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            let host = try await service.fetchUser(uid: meal.hostId)
-            guard let stripeId = host.stripeAccountId, host.stripeOnboarded == true else {
-                throw AppError.hostPaymentsNotReady
-            }
             createdOrderId = try await service.createOrder(
-                meal: meal, clientId: clientId,
-                hostStripeAccountId: stripeId,
+                meal: meal,
+                clientId: clientId,
                 portions: portions,
                 note: note.trimmingCharacters(in: .whitespacesAndNewlines)
             )

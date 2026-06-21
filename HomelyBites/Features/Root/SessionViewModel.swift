@@ -36,11 +36,6 @@ final class SessionViewModel {
         catch { globalErrorMessage = error.localizedDescription }
     }
 
-    func handleIncomingDeepLink(_ url: URL) async {
-        guard url.scheme == "homelybites", url.host == "onboarding" else { return }
-        await refreshUserProfile()
-    }
-
     private func startAuthListener() {
         authListenerHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             guard let self else { return }

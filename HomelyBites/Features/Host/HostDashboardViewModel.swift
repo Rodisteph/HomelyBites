@@ -7,14 +7,11 @@ import FirebaseFirestore
 final class HostDashboardViewModel {
     var receivedOrders: [Order] = []
     var isLoading = false
-    var isActivatingPayments = false
-    var onboardingURL: URL?
     var errorMessage: String?
     var successMessage: String?
     var showingCreateMeal = false
 
     private let firestoreService = FirestoreService()
-    private let functionsService = CloudFunctionsService()
     @ObservationIgnored private var listener: ListenerRegistration?
 
     deinit { listener?.remove() }
@@ -36,17 +33,6 @@ final class HostDashboardViewModel {
         defer { isLoading = false }
         do { receivedOrders = try await firestoreService.fetchHostOrders(hostId: hostId) }
         catch { errorMessage = error.localizedDescription }
-    }
-
-    func activatePayments() async {
-        isActivatingPayments = true
-        defer { isActivatingPayments = false }
-        do {
-            _ = try await functionsService.createConnectAccount()
-            onboardingURL = try await functionsService.createOnboardingLink()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 
     func updateOrderStatus(orderId: String, status: OrderStatus) async {

@@ -13,25 +13,8 @@ final class CloudFunctionsService {
         return payload
     }
 
-    func createConnectAccount() async throws -> String {
-        let payload = try await call("createConnectAccount")
-        guard let accountId = payload["accountId"] as? String else {
-            throw AppError.invalidResponse
-        }
-        return accountId
-    }
-
-    func createOnboardingLink() async throws -> URL {
-        let payload = try await call("createOnboardingLink")
-        guard
-            let urlString = payload["url"] as? String,
-            let url = URL(string: urlString)
-        else { throw AppError.invalidResponse }
-        return url
-    }
-
-    func createPaymentIntentWithFee(orderId: String) async throws -> String {
-        let payload = try await call("createPaymentIntentWithFee", data: ["orderId": orderId])
+    func createPaymentIntent(orderId: String) async throws -> String {
+        let payload = try await call("createPaymentIntent", data: ["orderId": orderId])
         guard
             let clientSecret = payload["clientSecret"] as? String,
             !clientSecret.isEmpty

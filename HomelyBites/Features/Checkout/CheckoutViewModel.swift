@@ -23,7 +23,7 @@ final class CheckoutViewModel {
         defer { isPreparing = false }
 
         do {
-            let clientSecret = try await service.createPaymentIntentWithFee(orderId: orderId)
+            let clientSecret = try await service.createPaymentIntent(orderId: orderId)
 
             var config = PaymentSheet.Configuration()
             config.merchantDisplayName = "HomelyBites"
@@ -39,7 +39,7 @@ final class CheckoutViewModel {
 
     func handlePaymentResult(_ result: PaymentSheetResult) {
         switch result {
-        case .completed: statusMessage = "Paiement envoye. Confirmation via webhook Stripe."
+        case .completed: statusMessage = "Paiement envoye. Confirmation en cours."
         case .canceled:  statusMessage = "Paiement annule."
         case .failed(let error): errorMessage = error.localizedDescription
         }

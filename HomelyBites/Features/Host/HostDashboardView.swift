@@ -7,14 +7,6 @@ struct HostDashboardView: View {
     var body: some View {
         List {
             if let user = session.appUser {
-                Section("Paiements") {
-                    stripeStatusRow(user: user)
-                    activatePaymentsButton
-                    Button("Rafraichir profil Stripe") {
-                        Task { await session.refreshUserProfile() }
-                    }
-                }
-
                 Section("Repas") {
                     Button("Creer un repas") { viewModel.showingCreateMeal = true }
                     Button("Seed 2 repas de test") {
@@ -39,7 +31,7 @@ struct HostDashboardView: View {
                 }
             }
         }
-        .navigationTitle("Host Dashboard")
+        .navigationTitle("Dashboard Host")
         .task {
             guard let hostId = session.appUser?.id else { return }
             viewModel.startListening(hostId: hostId)
@@ -48,42 +40,11 @@ struct HostDashboardView: View {
         .refreshable {
             guard let hostId = session.appUser?.id else { return }
             await viewModel.refresh(hostId: hostId)
-            await session.refreshUserProfile()
         }
         .sheet(isPresented: $viewModel.showingCreateMeal) {
             if let user = session.appUser { CreateMealView(host: user) }
         }
-        .sheet(isPresented: Binding(
-            get:  { viewModel.onboardingURL != nil },
-            set:  { if !$0 { viewModel.onboardingURL = nil } }
-        )) {
-            if let url = viewModel.onboardingURL { SafariView(url: url) }
-        }
         .errorAlert(message: $viewModel.errorMessage)
-    }
-
-    private func stripeStatusRow(user: AppUser) -> some View {
-        HStack {
-            Text("Stripe status")
-            Spacer()
-            Text(user.isStripeReady ? "Onboarde" : "Non pret")
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(user.isStripeReady ? Color.green.opacity(0.2) : Color.orange.opacity(0.2), in: Capsule())
-                .foregroundStyle(user.isStripeReady ? .green : .orange)
-        }
-    }
-
-    private var activatePaymentsButton: some View {
-        Button {
-            Task { await viewModel.activatePayments() }
-        } label: {
-            if viewModel.isActivatingPayments {
-                HStack { ProgressView(); Text("Ouverture Stripe...") }
-            } else {
-                Text("Activer paiements")
-            }
-        }
     }
 }
 

@@ -55,14 +55,13 @@ final class FirestoreService {
     func createOrder(
         meal: Meal,
         clientId: String,
-        hostStripeAccountId: String,
         portions: Int,
         note: String
     ) async throws -> String {
         let ref   = db.collection("orders").document()
         let order = Order(
             id: ref.documentID, mealId: meal.id, clientId: clientId,
-            hostId: meal.hostId, hostStripeAccountId: hostStripeAccountId,
+            hostId: meal.hostId,
             portions: portions, note: note, status: .pending,
             paymentStatus: .requires_payment,
             amountCents: meal.priceCents * portions, currency: "eur",

@@ -22,9 +22,7 @@ final class AuthService {
         let user = AppUser(
             id: result.user.uid,
             fullName: fullName,
-            role: role,
-            stripeAccountId: nil,
-            stripeOnboarded: false
+            role: role
         )
         try await db.collection("users").document(result.user.uid).setData(user.toFirestore())
     }
